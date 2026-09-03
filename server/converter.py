@@ -15,6 +15,8 @@ from __future__ import annotations
 import os
 import queue
 import subprocess
+import tempfile
+import sys
 import threading
 import traceback
 import uuid
@@ -72,111 +74,135 @@ def _kill_pids(pids) -> None:
             pass
 
 
-def hwp_to_pdf(src: str, dst: str) -> None:
-    """한글 문서(.hwp/.hwpx/.hml)를 PDF로 저장한다."""
-    import win32com.client as wc
+# 한글 문서 하나를 바꾸는 데 허용할 시간(초). 보통 2~5초면 끝난다.
+# 이 시간을 넘기면 대화상자에 막혔거나 굳은 것으로 보고 끊는다.
+HWP_TIMEOUT_SECONDS = 90
 
+
+def security_module_registered() -> bool:
+    """
+    한글 자동화용 보안 모듈이 등록되어 있는지 본다.
+
+    등록되어 있지 않으면 한글이 파일을 열 때마다 "파일 접근을 허용하시겠습니까"
+    대화상자를 띄운다. 창을 숨겨 둔 채로는 그 상자가 화면에 보이지 않아
+    사용자는 멈춘 줄도 모르고 기다리게 된다.
+    """
+    import winreg
+    for path in (r"SOFTWARE\HNC\HwpCtrl\Modules",
+                 r"SOFTWARE\HNC\HwpAutomation\Modules"):
+        try:
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, path) as key:
+                if winreg.QueryInfoKey(key)[1] > 0:      # 값이 하나라도 있으면 등록된 것
+                    return True
+        except OSError:
+            continue
+    return False
+
+
+def hwp_to_pdf(src: str, dst: str, timeout: int = HWP_TIMEOUT_SECONDS) -> None:
+    """
+    한글 문서(.hwp/.hwpx/.hml)를 PDF 로 저장한다.
+
+    실제 변환은 hwp_convert.py 를 별도 프로세스로 띄워 맡긴다. 한글 COM 은
+    대화상자 하나에도 영영 멈출 수 있는데, 같은 프로세스 안에서는 그 멈춤을
+    끊을 방법이 없기 때문이다. 프로세스를 나누면 시간을 재다가 끊을 수 있다.
+    """
     # 사용자가 이미 한글을 켜 둔 채로 작업할 수 있다. 그 창을 건드리면 안 되므로
-    # 우리 몫의 인스턴스를 따로 띄우고(DispatchEx), 정리할 때도 우리가 만든
-    # 프로세스만 골라서 닫는다.
-    before = _list_pids("Hwp.exe")
-
-    hwp = None
-    try:
-        hwp = wc.DispatchEx("HWPFrame.HwpObject")
-    except Exception as e:
-        raise ConversionError(
-            "한컴오피스(한글)를 찾을 수 없습니다. 한글이 설치된 Windows PC에서 실행해 주세요."
-        ) from e
-
-    try:
-        # 파일 접근 보안 경고창을 없앤다. 이게 없으면 변환이 대화상자에서 멈춘다.
-        try:
-            hwp.RegisterModule("FilePathCheckDLL", "FilePathCheckerModule")
-        except Exception:
-            pass  # 모듈이 없어도 열리는 환경이 있으므로 계속 진행한다.
-
-        try:
-            hwp.XHwpWindows.Item(0).Visible = False
-        except Exception:
-            pass
-
-        # 반드시 3-인자 형식으로 부른다. hwp.Open(path) 한 인자짜리는 응답 없이 멈추고,
-        # arg 문자열에 versionwarning 같은 미지원 옵션을 넣어도 똑같이 멈춘다.
-        # 형식 인자는 빈 문자열로 두어 .hwp/.hwpx/.hml 을 자동 판별하게 한다.
-        opened = hwp.Open(src, "", "forceopen:true")
-        if opened is False:
-            raise ConversionError(
-                f"'{os.path.basename(src)}' 파일을 열 수 없습니다. "
-                "손상되었거나 DRM(문서 보안)이 걸린 파일일 수 있습니다."
-            )
-
-        if hwp.SaveAs(dst, "PDF", "") is False or not os.path.exists(dst):
-            raise ConversionError(f"'{os.path.basename(src)}' 을(를) PDF로 변환하지 못했습니다.")
-    finally:
-        if hwp is not None:
-            try:
-                hwp.Clear(1)  # 저장 안 함 - 변경사항 확인 대화상자를 막는다.
-            except Exception:
-                pass
-            try:
-                hwp.Quit()
-            except Exception:
-                pass
-        # Quit() 후에도 남는 경우가 있다. 이번에 새로 생긴 것만 정리한다.
-        _kill_pids(_list_pids("Hwp.exe") - before)
+    # 우리가 새로 만든 프로세스만 골라서 정리한다.
+    # 보안 모듈이 없으면 대화상자가 뜬다. 숨겨 두면 답할 수도 없으니 창을 보여준다.
+    _run_helper(src, dst, timeout=timeout, visible=not security_module_registered())
 
 
-def office_to_pdf(src: str, dst: str) -> None:
-    """Word/Excel/PowerPoint 문서를 PDF로 저장한다."""
-    import win32com.client as wc
+# 파일 형식별로, 변환할 때 새로 뜨는 프로그램의 실행 파일 이름.
+# 타임아웃으로 끊었을 때 이 프로세스들이 좀비로 남아 쌓이므로 함께 정리한다.
+_SPAWNED_EXE = {
+    **{e: "Hwp.exe" for e in HWP_EXTS},
+    **{e: "WINWORD.EXE" for e in WORD_EXTS},
+    **{e: "EXCEL.EXE" for e in EXCEL_EXTS},
+    **{e: "POWERPNT.EXE" for e in PPT_EXTS},
+}
 
-    ext = os.path.splitext(src)[1].lower()
-    app = doc = None
 
-    # Dispatch 는 이미 떠 있는 Office 에 붙는다. 그 상태에서 Quit() 하면 사용자가
-    # 편집 중이던 문서까지 닫히므로, 반드시 DispatchEx 로 별도 인스턴스를 쓴다.
+def _run_helper(src: str, dst: str, *, timeout: int, visible: bool) -> None:
+    """변환 도우미 프로세스를 띄우고, 시간을 재다가 넘기면 끊는다."""
+    # 이 문서를 열 때 뜨는 프로그램만 정리 대상으로 삼는다. 이름으로 싸잡아
+    # 죽이면 사용자가 편집 중이던 문서까지 닫히므로, 작업 전후 PID 를 견줘
+    # 우리가 새로 만든 것만 고른다.
+    exe = _SPAWNED_EXE.get(os.path.splitext(src)[1].lower(), "Hwp.exe")
+    before = _list_pids(exe)
+
+    helper = os.path.join(os.path.dirname(os.path.abspath(__file__)), "hwp_convert.py")
+    cmd = [sys.executable, helper, src, dst]
+    if visible:
+        cmd.append("--visible")
+
+    # 자식의 출력을 파이프가 아니라 임시 파일로 받는다.
+    #
+    # capture_output=True 로 파이프를 쓰면 타임아웃 때 파이썬이 자식을 죽인 뒤
+    # 파이프를 비우려고 기다리는데, 자식이 띄운 Hwp.exe 가 그 파이프를 물고 있으면
+    # 영영 끝나지 않는다. 타임아웃을 걸어 둔 의미가 사라진다(실측).
+    # 파일로 받으면 비울 파이프 자체가 없어 이 교착이 생기지 않는다.
+    log_fd, log_path = tempfile.mkstemp(prefix="hwpconv_", suffix=".log")
+    os.close(log_fd)
 
     try:
-        if ext in WORD_EXTS:
-            app = wc.DispatchEx("Word.Application")
-            app.Visible = False
-            app.DisplayAlerts = 0
-            doc = app.Documents.Open(src, ReadOnly=True, AddToRecentFiles=False)
-            doc.ExportAsFixedFormat(dst, 17)  # 17 = wdExportFormatPDF
-        elif ext in EXCEL_EXTS:
-            app = wc.DispatchEx("Excel.Application")
-            app.Visible = False
-            app.DisplayAlerts = False
-            doc = app.Workbooks.Open(src, ReadOnly=True, UpdateLinks=0)
-            doc.ExportAsFixedFormat(0, dst)  # 0 = xlTypePDF
-        elif ext in PPT_EXTS:
-            app = wc.DispatchEx("PowerPoint.Application")
-            doc = app.Presentations.Open(src, ReadOnly=True, WithWindow=False)
-            doc.SaveAs(dst, 32)  # 32 = ppSaveAsPDF
+        with open(log_path, "wb") as sink:
+            proc = subprocess.run(cmd, stdout=sink, stderr=subprocess.STDOUT,
+                                  stdin=subprocess.DEVNULL, timeout=timeout)
+        returncode = proc.returncode
+    except subprocess.TimeoutExpired:
+        _kill_pids(_list_pids(exe) - before)
+        name = os.path.basename(src)
+        if visible:
+            # 보안 모듈이 없어 창을 띄운 경우다. 대화상자에 막혔을 가능성이 크다.
+            msg = [
+                f"'{name}' 변환이 {timeout}초를 넘겨 중단했습니다.",
+                "한글 창에 확인 대화상자가 떠 있었을 수 있습니다.",
+                "화면에 한글 창이 보이면 그 상자에 답한 뒤 다시 시도해 주세요.",
+                "계속 이러면 사용설명서의 '변환이 멈출 때' 항목을 봐 주세요.",
+            ]
         else:
-            raise ConversionError(f"지원하지 않는 형식입니다: {ext}")
-    except ConversionError:
-        raise
-    except Exception as e:
-        raise ConversionError(
-            f"'{os.path.basename(src)}' 변환에 실패했습니다. "
-            "Microsoft Office가 설치되어 있는지 확인해 주세요."
-        ) from e
+            msg = [
+                f"'{name}' 변환이 {timeout}초를 넘겨 중단했습니다.",
+                "프로그램이 응답하지 않는 상태이거나 문서가 너무 큽니다.",
+                "사용설명서의 '변환이 멈출 때' 항목을 봐 주세요.",
+            ]
+        raise ConversionError(chr(10).join(msg))
+    finally:
+        # 성공하든 실패하든 우리가 띄운 프로그램은 반드시 정리한다.
+        _kill_pids(_list_pids(exe) - before)
+
+    try:
+        out = open(log_path, encoding="utf-8", errors="replace").read().strip()
+    except OSError:
+        out = ""
     finally:
         try:
-            if doc is not None:
-                doc.Close(0) if ext not in PPT_EXTS else doc.Close()
-        except Exception:
+            os.remove(log_path)
+        except OSError:
             pass
-        try:
-            if app is not None:
-                app.Quit()
-        except Exception:
-            pass
+
+    last = out.splitlines()[-1] if out else ""
+
+    if returncode != 0 or not last.startswith("OK|"):
+        reason = last.split("|", 1)[1] if "|" in last else ""
+        if not reason:
+            reason = "알 수 없는 오류"
+        raise ConversionError(reason)
 
     if not os.path.exists(dst):
-        raise ConversionError(f"'{os.path.basename(src)}' 의 PDF 결과가 생성되지 않았습니다.")
+        raise ConversionError(f"'{os.path.basename(src)}' 의 PDF 결과가 만들어지지 않았습니다.")
+
+
+def office_to_pdf(src: str, dst: str, timeout: int = HWP_TIMEOUT_SECONDS) -> None:
+    """
+    Word/Excel/PowerPoint 문서를 PDF 로 저장한다.
+
+    한글과 마찬가지로 별도 프로세스에 맡긴다. Office COM 도 복구 대화상자나
+    글꼴 경고에 막혀 멈출 수 있고, 창을 숨겨 둔 상태에서는 그 상자가 보이지
+    않아 사용자는 끝없이 기다리게 된다.
+    """
+    _run_helper(src, dst, timeout=timeout, visible=False)
 
 
 def image_to_pdf(src: str, dst: str) -> None:

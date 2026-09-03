@@ -167,7 +167,14 @@ def make_merge_job(files: List[tuple[str, bytes]], *, bookmarks: bool = True) ->
         for i, (display, path) in enumerate(staged, start=1):
             j.message = f"({i}/{len(staged)}) {display} 변환 중"
             out = os.path.join(workdir, f"conv_{i:03d}.pdf")
-            any_to_pdf(path, out)
+            try:
+                any_to_pdf(path, out)
+            except ConversionError as e:
+                # 변환기는 우리가 붙인 임시 이름(000.hwp)만 안다. 사용자가 올린
+                # 원래 이름으로 바꿔 줘야 어느 파일이 문제인지 알 수 있다.
+                raise ConversionError(
+                    str(e).replace(os.path.basename(path), display)
+                ) from e
             pdf_paths.append((display, out))
             j.progress = i
 
@@ -207,7 +214,10 @@ def make_topdf_job(name: str, data: bytes) -> Job:
     def run(j: Job) -> None:
         j.message = f"{name} 변환 중"
         out = os.path.join(workdir, "out.pdf")
-        any_to_pdf(src, out)
+        try:
+            any_to_pdf(src, out)
+        except ConversionError as e:
+            raise ConversionError(str(e).replace(os.path.basename(src), name)) from e
         j.result_path = out
         j.progress = 1
 
