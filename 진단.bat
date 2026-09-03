@@ -1,40 +1,42 @@
 @echo off
-chcp 65001 >nul
-title í•œëª¨ì•„ ì§„ë‹¨
+chcp 949 >nul
+title ÇÑ¸ð¾Æ Áø´Ü
 cd /d "%~dp0"
 
 echo.
 echo   ============================================
-echo     í•œëª¨ì•„ ì§„ë‹¨ - ë¬´ì—‡ì´ ë§‰í˜”ëŠ”ì§€ ì•Œì•„ë´…ë‹ˆë‹¤
+echo     ÇÑ¸ð¾Æ Áø´Ü - ¹«¾ùÀÌ ¸·Çû´ÂÁö ¾Ë¾Æº¾´Ï´Ù
 echo   ============================================
 echo.
 
-echo   [1] Python ìœ„ì¹˜
+echo   [1] Python À§Ä¡
 where python 2>nul
 where py 2>nul
 echo.
 
-echo   [2] Python ì´ ì‹¤ì œë¡œ ëŒ€ë‹µí•˜ëŠ”ì§€
-python -c "import sys; print('   ì‹¤í–‰íŒŒì¼:', sys.executable); print('   ë²„ì „:', sys.version)" 2>&1
+echo   [2] Python ÀÌ ½ÇÁ¦·Î ´ë´äÇÏ´ÂÁö
+REM ÆÄÀÌ½ãÀÌ ÆÄÀÏ·Î Ãâ·ÂÇÒ ¶§´Â UTF-8 À» ¾²¹Ç·Î, ÄÜ¼Ö ÄÚµåÆäÀÌÁö¿Í ¾î±ß³ª
+REM ÇÑ±ÛÀÌ ±úÁø´Ù. ¿©±â ¶óº§¸¸ ¿µ¹®À¸·Î µÎ¸é ¾î¶² È¯°æ¿¡¼­µµ ÀÐÀ» ¼ö ÀÖ´Ù.
+python -c "import sys; print('   exe :', sys.executable); print('   ver :', sys.version)" 2>&1
 echo.
 
-echo   [3] pip ìƒíƒœ
+echo   [3] pip »óÅÂ
 python -m pip --version 2>&1
 echo.
 
-echo   [4] íŒ¨í‚¤ì§€ ì„œë²„ ì ‘ì† ì‹œí—˜
+echo   [4] ÆÐÅ°Áö ¼­¹ö Á¢¼Ó ½ÃÇè
 echo   ------------------------------------------
 python -m pip download fastapi --no-deps --dest "%TEMP%\hanmoa_netcheck" 2>&1
 echo   ------------------------------------------
 echo.
 
-echo   ìœ„ [4] ê²°ê³¼ë¥¼ í™•ì¸í•˜ì„¸ìš”.
+echo   À§ [4] °á°ú¸¦ È®ÀÎÇÏ¼¼¿ä.
 echo.
-echo   Saved ë˜ëŠ” Downloading ì´ ë³´ì´ë©´  ^-^> ë„¤íŠ¸ì›Œí¬ëŠ” ì •ìƒìž…ë‹ˆë‹¤.
-echo   ProxyError SSLError timed out ì´ ë³´ì´ë©´  ^-^> í•™êµ ë°©í™”ë²½ì´ ë§‰ê³  ìžˆìŠµë‹ˆë‹¤.
-echo                                              íœ´ëŒ€í° í•«ìŠ¤íŒŸìœ¼ë¡œ ì‹œë„í•˜ì„¸ìš”.
-echo   Permission denied ê°€ ë³´ì´ë©´  ^-^> ê´€ë¦¬ìž ê¶Œí•œìœ¼ë¡œ ë‹¤ì‹œ ì‹¤í–‰í•˜ì„¸ìš”.
+echo   Saved ¶Ç´Â Downloading ÀÌ º¸ÀÌ¸é  ^-^> ³×Æ®¿öÅ©´Â Á¤»óÀÔ´Ï´Ù.
+echo   ProxyError SSLError timed out ÀÌ º¸ÀÌ¸é  ^-^> ÇÐ±³ ¹æÈ­º®ÀÌ ¸·°í ÀÖ½À´Ï´Ù.
+echo                                              ÈÞ´ëÆù ÇÖ½ºÆÌÀ¸·Î ½ÃµµÇÏ¼¼¿ä.
+echo   Permission denied °¡ º¸ÀÌ¸é  ^-^> °ü¸®ÀÚ ±ÇÇÑÀ¸·Î ´Ù½Ã ½ÇÇàÇÏ¼¼¿ä.
 echo.
-echo   ì´ í™”ë©´ì„ ìº¡ì²˜í•´ì„œ ë³´ì—¬ì£¼ì‹œë©´ ì •í™•ížˆ ì§šì–´ ë“œë¦´ ìˆ˜ ìžˆìŠµë‹ˆë‹¤.
+echo   ÀÌ È­¸éÀ» Ä¸Ã³ÇØ¼­ º¸¿©ÁÖ½Ã¸é Á¤È®È÷ Â¤¾î µå¸± ¼ö ÀÖ½À´Ï´Ù.
 echo.
 pause
