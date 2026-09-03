@@ -29,6 +29,12 @@ if not defined PYEXE (
 )
 if not defined PYEXE goto NEED_PYTHON
 
+REM Windows 에는 진짜 Python 이 없어도 python.exe 라는 껍데기가 있다.
+REM 실행하면 Microsoft Store 를 열 뿐이라 where 로는 구분이 안 된다.
+REM 실제로 버전을 물어봐서 대답하는지로 판별한다.
+%PYEXE% -c "import sys" >nul 2>&1
+if errorlevel 1 goto FAKE_PYTHON
+
 REM 필요한 구성요소가 없을 때만 설치한다.
 %PYEXE% -c "import fastapi, uvicorn, pypdf, pymupdf, pdf2docx, openpyxl, pptx, multipart" >nul 2>&1
 if errorlevel 1 goto INSTALL_DEPS
@@ -91,21 +97,81 @@ echo   처음 실행이라 필요한 구성요소를 설치합니다. 2~3분 걸
 echo   이때만 인터넷이 필요합니다.
 echo.
 %PYEXE% -m pip install --disable-pip-version-check -q -r server/requirements.txt
-if errorlevel 1 goto INSTALL_FAILED
+if errorlevel 1 goto SHOW_REAL_ERROR
 echo   설치가 끝났습니다.
 echo.
 goto RUN
 
 
+REM 조용한 설치가 실패하면 무엇이 문제인지 알 수 없다.
+REM 같은 명령을 조용하지 않게 한 번 더 돌려 진짜 오류를 화면에 남긴다.
+:SHOW_REAL_ERROR
+echo   ------------------------------------------
+echo   설치가 실패했습니다. 원인을 확인합니다...
+echo   ------------------------------------------
+echo.
+%PYEXE% -m pip install --disable-pip-version-check -r server/requirements.txt
+echo.
+goto INSTALL_FAILED
+
+
 :INSTALL_FAILED
+echo   ==========================================
+echo     설치에 실패했습니다
+echo   ==========================================
 echo.
-echo   [문제] 설치에 실패했습니다.
+echo   바로 위에 영어로 나온 줄이 진짜 원인입니다.
+echo   그 내용에 따라 아래를 확인해 보세요.
 echo.
-echo   - 인터넷 연결을 확인해 주세요.
-echo   - 학교나 회사 네트워크라면 보안 프로그램이 파이썬 패키지 서버
-echo     pypi.org 접속을 막고 있을 수 있습니다.
-echo     그럴 때는 휴대폰 핫스팟에 연결해 이 설치 한 번만 해 보세요.
-echo     한 번 설치하고 나면 그다음부터는 인터넷이 필요 없습니다.
+echo   [1] ProxyError, SSLError, timed out, Network is unreachable
+echo       학교 네트워크가 파이썬 패키지 서버 pypi.org 를 막고 있습니다.
+echo       휴대폰 핫스팟에 연결해 이 설치 한 번만 해 보세요.
+echo       한 번 설치하면 그다음부터는 인터넷이 필요 없습니다.
+echo.
+echo   [2] Permission denied, Access is denied, WinError 5
+echo       설치 권한이 없습니다. 이 파일에 마우스 오른쪽을 눌러
+echo       관리자 권한으로 실행 을 골라 다시 해 보세요.
+echo.
+echo   [3] No module named pip
+echo       Python 은 있는데 pip 가 빠져 있습니다.
+echo       Python 을 다시 설치하되 설치 화면에서 pip 항목을 켜 주세요.
+echo.
+echo   ------------------------------------------
+echo   설치가 계속 안 되면, 설치 없이 웹으로 쓰셔도 됩니다.
+echo.
+echo       https://choeeunsuk.github.io/hanmoa/
+echo.
+echo   PDF 병합 분할 압축 글자인식 등 대부분의 도구를
+echo   그냥 브라우저에서 쓸 수 있습니다.
+echo   한글 HWP 병합만 이 프로그램이 필요합니다.
+echo   ------------------------------------------
 echo.
 pause
 exit /b 1
+
+
+:FAKE_PYTHON
+echo   [문제] 진짜 Python 이 아니라 Windows 의 껍데기가 잡혔습니다.
+echo.
+echo   python 이라는 이름은 있지만 실행하면 Microsoft Store 만 열립니다.
+echo   해결 방법은 둘 중 하나입니다.
+echo.
+echo   방법 1. python.org 에서 정식으로 설치하기  ^<권장^>
+echo      곧 열리는 페이지에서 내려받아 설치하세요.
+echo      설치 첫 화면 맨 아래
+echo          Add python.exe to PATH
+echo      를 반드시 체크해야 합니다.
+echo.
+echo   방법 2. 껍데기 끄기
+echo      설정 을 열고 앱 실행 별칭 을 검색한 뒤
+echo      python.exe 와 python3.exe 를 끄세요.
+echo      그다음 방법 1 을 하시면 됩니다.
+echo.
+echo   설치가 끝나면 이 창으로 돌아와 아무 키나 누르세요.
+echo.
+start "" "https://www.python.org/downloads/"
+pause >nul
+echo.
+echo   다시 확인합니다...
+echo.
+goto CHECK_PYTHON
