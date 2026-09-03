@@ -84,8 +84,11 @@ def main() -> int:
 
     step("한글 판본 확인")
     try:
-        ver = hwp.Version
-        ok(f"{ver}")
+        ver = str(hwp.Version)
+        major = ver.split(",")[0].strip()
+        names = {"7": "한글 2007", "8": "한글 2010", "9": "한글 2014",
+                 "10": "한글 NEO / 2018", "11": "한글 2020", "12": "한컴오피스 2022"}
+        ok(f"{ver}   ({names.get(major, '알 수 없는 판본')})")
     except Exception as e:
         ok(f"읽지 못함: {e}")
 
@@ -168,20 +171,14 @@ def main() -> int:
     made_temp = False
 
     if not src:
-        step("검사용 문서 만들기")
-        try:
-            import tempfile
-            src = os.path.join(tempfile.gettempdir(), "hanmoa_probe.hwp")
-            hwp.HAction.GetDefault("InsertText", hwp.HParameterSet.HInsertText.HSet)
-            hwp.HParameterSet.HInsertText.Text = "한모아 진단용 문서입니다."
-            hwp.HAction.Execute("InsertText", hwp.HParameterSet.HInsertText.HSet)
-            hwp.SaveAs(src, "HWP", "")
-            made_temp = True
-            ok(f"{src} ({os.path.getsize(src):,} bytes)")
-            hwp.Clear(1)
-        except Exception as e:
-            ok(f"실패: {e}")
-            src = None
+        # 문서를 새로 만드는 길은 판본마다 쓰는 명령이 달라 여기서 막힐 수 있다.
+        # 진짜로 알고 싶은 것은 "사용자의 그 파일이 변환되는가" 이므로 파일을 받는다.
+        print()
+        print("  검사할 한글 파일을 지정해 주세요.")
+        print("  한글진단.bat 위로 .hwp 파일을 끌어다 놓으면 그 파일로 검사합니다.")
+        print()
+        step("파일 없이 할 수 있는 확인만 마칩니다")
+        ok("위 항목이 모두 정상이면 한글 연결 자체는 문제가 없습니다")
 
     if src and os.path.exists(src):
         step(f"창 숨기기")
@@ -206,16 +203,22 @@ def main() -> int:
 
         if r is not False:
             dst = os.path.splitext(src)[0] + "_진단결과.pdf"
-            step(f"PDF 로 저장   <- 여기서 멈추면 PDF 기능 문제입니다")
+            step("PDF 로 저장 (판본마다 다른 방법을 차례로 시도합니다)")
             try:
-                r2 = hwp.SaveAs(dst, "PDF", "")
-                exists = os.path.exists(dst)
-                ok(f"반환값 {r2!r} · 파일생성 {exists}"
-                   + (f" · {os.path.getsize(dst):,} bytes" if exists else ""))
-                if exists:
+                from hwp_convert import save_as_pdf
+                saved, why = save_as_pdf(hwp, dst)
+                if saved:
+                    ok(f"성공 · {os.path.getsize(dst):,} bytes")
                     print()
                     print("  ===== 변환 성공 =====")
                     print(f"  결과: {dst}")
+                else:
+                    ok("모든 방법 실패")
+                    print(f"             시도 결과: {why}")
+                    print()
+                    print("  [원인] 이 한글 판본이 자동 PDF 저장을 받지 않습니다.")
+                    print("         한글에서 파일을 열어 «PDF로 저장하기» 가 되는지 확인해 보세요.")
+                    print("         메뉴에 그 항목이 없다면 판본을 올려야 합니다.")
             except Exception as e:
                 ok(f"실패: {e}")
     else:

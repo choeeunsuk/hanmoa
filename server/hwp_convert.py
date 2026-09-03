@@ -32,6 +32,51 @@ except Exception:
     pass
 
 
+def save_as_pdf(hwp, dst: str) -> tuple[bool, str]:
+    """
+    한글 문서를 PDF 로 저장한다. 판본마다 되는 방법이 달라 차례로 시도한다.
+
+    판본에 따라 SaveAs 의 "PDF" 형식을 받아 주지 않는 경우가 있다(한글 10 세대
+    등). 그럴 때는 파일 저장 동작(FileSaveAsPdf)을 직접 실행하는 길이 남아 있다.
+    어느 쪽이 통하는지는 미리 알 수 없으므로 되는 것이 나올 때까지 해 본다.
+    """
+    tried = []
+
+    # 1) 가장 흔한 길. 최신 판본은 이것으로 끝난다.
+    try:
+        r = hwp.SaveAs(dst, "PDF", "")
+        if r is not False and os.path.exists(dst):
+            return True, ""
+        tried.append(f"SaveAs(PDF)={r!r}")
+    except Exception as e:
+        tried.append(f"SaveAs(PDF) 예외: {e}")
+
+    # 2) 파일 저장 동작을 직접 실행한다. 구버전에서 통하는 경우가 있다.
+    try:
+        act = "FileSaveAsPdf"
+        pset = hwp.HParameterSet.HFileOpenSave
+        hwp.HAction.GetDefault(act, pset.HSet)
+        pset.filename = dst
+        pset.Format = "PDF"
+        r = hwp.HAction.Execute(act, pset.HSet)
+        if r is not False and os.path.exists(dst):
+            return True, ""
+        tried.append(f"HAction(FileSaveAsPdf)={r!r}")
+    except Exception as e:
+        tried.append(f"HAction(FileSaveAsPdf) 예외: {e}")
+
+    # 3) 형식 이름을 다르게 적어 본다. 판본에 따라 받는 이름이 다르다.
+    for fmt in ("PDF", "pdf", "HWPPDF"):
+        try:
+            r = hwp.SaveAs(dst, fmt, "")
+            if r is not False and os.path.exists(dst):
+                return True, ""
+        except Exception:
+            pass
+
+    return False, " / ".join(tried)
+
+
 def _hwp_pids() -> set:
     """지금 떠 있는 Hwp.exe 의 PID 들. 우리가 새로 만든 것을 가려내는 데 쓴다."""
     import subprocess
@@ -160,8 +205,10 @@ def run_batch(jobs, visible: bool) -> int:
                       + _dialog_note(watcher))
                 return 1
 
-            if hwp.SaveAs(dst, "PDF", "") is False or not os.path.exists(dst):
-                print(f"ERR|'{os.path.basename(src)}' 을(를) PDF 로 저장하지 못했습니다."
+            saved, why = save_as_pdf(hwp, dst)
+            if not saved:
+                print(f"ERR|'{os.path.basename(src)}' 을(를) PDF 로 저장하지 못했습니다. "
+                      f"한글 판본이 이 방식을 받지 않는 것 같습니다. ({why})"
                       + _dialog_note(watcher))
                 return 1
 
@@ -276,8 +323,10 @@ def main() -> int:
                   + _dialog_note(watcher))
             return 1
 
-        if hwp.SaveAs(dst, "PDF", "") is False or not os.path.exists(dst):
-            print(f"ERR|'{os.path.basename(src)}' 을(를) PDF 로 저장하지 못했습니다."
+        saved, why = save_as_pdf(hwp, dst)
+        if not saved:
+            print(f"ERR|'{os.path.basename(src)}' 을(를) PDF 로 저장하지 못했습니다. "
+                  f"한글 판본이 이 방식을 받지 않는 것 같습니다. ({why})"
                   + _dialog_note(watcher))
             return 1
 
