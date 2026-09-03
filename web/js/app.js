@@ -173,8 +173,15 @@
 
     if (need && !Backend.isReady()) {
       btn.disabled = true;
-      btn.textContent = '로컬 엔진이 필요합니다';
-      UI.setNote('start.bat 을 실행하면 이 도구가 켜집니다.');
+      // 웹에 올라간 판을 보는 사람에게는 start.bat 이 없다. 내려받는 것부터 안내한다.
+      if (Backend.canReachEngine) {
+        btn.textContent = '로컬 엔진이 필요합니다';
+        UI.setNote('start.bat 을 실행하면 이 도구가 켜집니다.');
+      } else {
+        btn.textContent = '내 컴퓨터에서만 됩니다';
+        UI.setNote('한글·오피스 변환은 웹에서 할 수 없습니다. 위 GitHub 링크에서 내려받아 '
+                 + 'start.bat 을 실행하면 이 도구를 쓸 수 있습니다.');
+      }
       return;
     }
     if (need && !Backend.has(need)) {
