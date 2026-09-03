@@ -185,9 +185,15 @@ def make_merge_job(files: List[tuple[str, bytes]], *, bookmarks: bool = True) ->
         if hwp_jobs:
             j.message = f"한글 문서 {len(hwp_jobs)}개 변환 준비 중"
 
+            started = time.time()
+
             def note(step: int, filename: str) -> None:
+                # 경과 시간을 함께 보여준다. 한글은 첫 문서를 여는 데만 1초에서
+                # 50초까지 들쭉날쭉해서(실측), 숫자가 올라가는 것을 보여주지
+                # 않으면 사용자는 멈춘 줄 알고 기다리기를 포기한다.
                 display = names.get(filename, filename)
-                j.message = f"({step}/{len(hwp_jobs)}) {display} 변환 중"
+                j.message = (f"({step}/{len(hwp_jobs)}) {display} 변환 중 "
+                             f"· {int(time.time() - started)}초 경과")
 
             try:
                 hwp_batch_to_pdf(hwp_jobs, on_progress=note)

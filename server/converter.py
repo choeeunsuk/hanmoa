@@ -160,6 +160,24 @@ _SPAWNED_EXE = {
 }
 
 
+def _last_step_of(log_path: str):
+    """로그에 적힌 마지막 진행 단계를 (순번, 파일명) 으로 돌려준다."""
+    try:
+        with open(log_path, encoding="utf-8", errors="replace") as fh:
+            steps = [ln.strip() for ln in fh if ln.startswith("PRG|")]
+    except OSError:
+        return None
+    if not steps:
+        return None
+    parts = steps[-1].split("|")
+    if len(parts) >= 3:
+        try:
+            return (int(parts[1]), parts[2])
+        except ValueError:
+            return None
+    return None
+
+
 def _pump_progress(log_path: str, reported: int, on_progress) -> int:
     """로그에 새로 생긴 PRG| 줄을 읽어 진행 상황을 알린다."""
     try:
@@ -226,12 +244,23 @@ def _run_helper(src, dst, *, timeout: int, visible: bool,
             # 파이프를 쓰면 타임아웃 때 교착이 생기므로 파일을 훔쳐본다.
             deadline = time.monotonic() + timeout
             reported = 0
+            last_step = None
             while proc.poll() is None:
                 if time.monotonic() > deadline:
                     proc.kill()
                     raise subprocess.TimeoutExpired(cmd, timeout)
                 if on_progress:
-                    reported = _pump_progress(log_path, reported, on_progress)
+                    new_count = _pump_progress(log_path, reported, on_progress)
+                    if new_count == reported and last_step:
+                        # 새 소식이 없어도 같은 단계를 다시 알려 경과 시간이
+                        # 화면에서 계속 올라가게 한다.
+                        try:
+                            on_progress(*last_step)
+                        except Exception:
+                            pass
+                    elif new_count > reported:
+                        last_step = _last_step_of(log_path)
+                    reported = new_count
                 time.sleep(0.4)
             if on_progress:
                 _pump_progress(log_path, reported, on_progress)

@@ -28,8 +28,11 @@ import win32con
 import win32gui
 import win32process
 
-# 표준 Windows 대화상자의 창 클래스 이름.
-DIALOG_CLASS = "#32770"
+# 창 클래스 이름으로는 확인창을 가려낼 수 없다.
+#
+# 표준 윈도우 대화상자는 #32770 이지만 한컴은 HNC_DIALOG 를 쓰고, 그마저도
+# 평소에 빈 창으로 늘 떠 있다(실측). 그래서 이름 대신 생김새로 판별한다.
+# 화면에 보이면서 «확인» 같은 단추를 가진 창만 답을 기다리는 것으로 본다.
 
 # 눌러도 되는 단추. 문서를 열고 저장하는 쪽으로 진행시키는 것들이다.
 # «취소»나 «아니오»는 누르지 않는다. 변환을 스스로 포기해 버리기 때문이다.
@@ -78,6 +81,25 @@ def _buttons_of(hwnd):
     return out
 
 
+def _looks_like_dialog(hwnd) -> bool:
+    """
+    답을 기다리는 확인창인지 생김새로 살핀다.
+
+    화면에 보이면서 «확인» 같은 단추를 가진 창이면 그렇게 본다. 한컴이
+    판올림하며 클래스 이름을 바꿔도 이 조건은 그대로 통한다.
+    """
+    try:
+        if not win32gui.IsWindowVisible(hwnd):
+            return False
+    except Exception:
+        return False
+    for _, text in _buttons_of(hwnd):
+        clean = text.replace("&", "").strip()
+        if any(clean.startswith(s) for s in SAFE_BUTTONS):
+            return True
+    return False
+
+
 def _press(hwnd, button) -> None:
     """단추를 누른다. 창을 활성화하지 않고 메시지만 보낸다."""
     try:
@@ -119,10 +141,12 @@ class DialogWatcher:
         return False
 
     def _loop(self) -> None:
-        handled = set()
+        handled = set()   # 이미 처리한 창. 같은 창을 반복해 누르지 않는다.
         while not self._stop.is_set():
             for hwnd, cls, title in _windows_of(self.pid):
-                if cls != DIALOG_CLASS or hwnd in handled:
+                if hwnd in handled:
+                    continue
+                if not _looks_like_dialog(hwnd):
                     continue
                 handled.add(hwnd)
 
