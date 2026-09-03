@@ -1,7 +1,7 @@
 # web 폴더를 GitHub Pages 로 올린다.
 #
-# 저장소 Settings > Pages > Source 를 "GitHub Actions" 로 한 번만 바꿔 두면,
-# 이후 main 에 밀어 넣을 때마다 알아서 갱신된다.
+# 설정 화면에 들어갈 필요가 없다. configure-pages 의 enablement 가 Pages 자체를
+# 켜 주므로, main 에 밀어 넣기만 하면 처음부터 알아서 배포된다.
 name: Deploy to GitHub Pages
 
 on:
@@ -26,9 +26,13 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
+      # enablement: 저장소에 Pages 가 아직 켜져 있지 않으면 여기서 켠다.
+      # 이게 없으면 첫 배포가 "Get Pages site failed" 로 실패한다(실측).
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
 
       # 서버가 필요 없는 정적 파일만 올린다. server 폴더는 올라가지 않는다.
       - uses: actions/upload-pages-artifact@v3
