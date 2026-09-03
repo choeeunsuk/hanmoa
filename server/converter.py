@@ -16,6 +16,7 @@ import os
 import queue
 import subprocess
 import tempfile
+import time
 import sys
 import threading
 import traceback
@@ -74,9 +75,13 @@ def _kill_pids(pids) -> None:
             pass
 
 
-# 한글 문서 하나를 바꾸는 데 허용할 시간(초). 보통 2~5초면 끝난다.
-# 이 시간을 넘기면 대화상자에 막혔거나 굳은 것으로 보고 끊는다.
-HWP_TIMEOUT_SECONDS = 90
+# 문서 하나를 바꾸는 데 허용할 시간(초).
+#
+# 한글을 처음 띄우는 데만 30초가 넘게 걸리기도 한다(실측). 느린 PC 나 백신이
+# 검사 중인 PC 는 더 걸린다. 그래서 처음 한 번은 넉넉히 주고, 여러 건을 한
+# 번에 맡길 때는 건수만큼 더해 준다.
+HWP_TIMEOUT_SECONDS = 180
+HWP_TIMEOUT_PER_FILE = 45
 
 
 def security_module_registered() -> bool:
@@ -97,6 +102,38 @@ def security_module_registered() -> bool:
         except OSError:
             continue
     return False
+
+
+def hwp_batch_to_pdf(pairs, timeout: int | None = None, on_progress=None) -> None:
+    """
+    한글 문서 여러 개를 한 번에 PDF 로 만든다.
+
+    한글을 한 번만 띄워 전부 처리하므로, 파일마다 새로 띄우는 것보다 훨씬 빠르다.
+    첫 문서에서 30초 넘게 걸리던 것이 두 번째부터는 몇 초로 줄어든다.
+
+    pairs 는 [(원본, 결과), ...] 이고, on_progress(순번, 파일명) 이 있으면
+    문서를 하나 시작할 때마다 불러 준다.
+    """
+    import json
+
+    if not pairs:
+        return
+    if timeout is None:
+        timeout = HWP_TIMEOUT_SECONDS + HWP_TIMEOUT_PER_FILE * (len(pairs) - 1)
+
+    job_fd, job_path = tempfile.mkstemp(prefix="hwpjobs_", suffix=".json")
+    with os.fdopen(job_fd, "w", encoding="utf-8") as fh:
+        json.dump([[src, dst] for src, dst in pairs], fh, ensure_ascii=False)
+
+    try:
+        _run_helper(None, None, timeout=timeout,
+                    visible=not security_module_registered(),
+                    batch=job_path, exe="Hwp.exe", on_progress=on_progress)
+    finally:
+        try:
+            os.remove(job_path)
+        except OSError:
+            pass
 
 
 def hwp_to_pdf(src: str, dst: str, timeout: int = HWP_TIMEOUT_SECONDS) -> None:
@@ -123,16 +160,52 @@ _SPAWNED_EXE = {
 }
 
 
-def _run_helper(src: str, dst: str, *, timeout: int, visible: bool) -> None:
+def _pump_progress(log_path: str, reported: int, on_progress) -> int:
+    """로그에 새로 생긴 PRG| 줄을 읽어 진행 상황을 알린다."""
+    try:
+        with open(log_path, encoding="utf-8", errors="replace") as fh:
+            steps = [ln.strip() for ln in fh if ln.startswith("PRG|")]
+    except OSError:
+        return reported
+    for line in steps[reported:]:
+        parts = line.split("|")
+        if len(parts) >= 3:
+            try:
+                on_progress(int(parts[1]), parts[2])
+            except Exception:
+                pass
+    return len(steps)
+
+
+def _dialogs_from_log(log_path: str) -> str:
+    """도우미가 남긴 로그에서 대화상자 기록만 뽑아 온다."""
+    try:
+        with open(log_path, encoding="utf-8", errors="replace") as fh:
+            found = [ln[4:].strip() for ln in fh if ln.startswith("DLG|")]
+    except OSError:
+        return ""
+    # 같은 창이 여러 번 잡혔을 수 있으니 순서를 지키며 중복만 걷어낸다.
+    seen, out = set(), []
+    for item in found:
+        if item not in seen:
+            seen.add(item)
+            out.append(item)
+    return " / ".join(out)
+
+
+def _run_helper(src, dst, *, timeout: int, visible: bool,
+                batch: str | None = None, exe: str | None = None,
+                on_progress=None) -> None:
     """변환 도우미 프로세스를 띄우고, 시간을 재다가 넘기면 끊는다."""
     # 이 문서를 열 때 뜨는 프로그램만 정리 대상으로 삼는다. 이름으로 싸잡아
     # 죽이면 사용자가 편집 중이던 문서까지 닫히므로, 작업 전후 PID 를 견줘
     # 우리가 새로 만든 것만 고른다.
-    exe = _SPAWNED_EXE.get(os.path.splitext(src)[1].lower(), "Hwp.exe")
+    if exe is None:
+        exe = _SPAWNED_EXE.get(os.path.splitext(src)[1].lower(), "Hwp.exe")
     before = _list_pids(exe)
 
     helper = os.path.join(os.path.dirname(os.path.abspath(__file__)), "hwp_convert.py")
-    cmd = [sys.executable, helper, src, dst]
+    cmd = [sys.executable, helper] + (["--batch", batch] if batch else [src, dst])
     if visible:
         cmd.append("--visible")
 
@@ -147,26 +220,43 @@ def _run_helper(src: str, dst: str, *, timeout: int, visible: bool) -> None:
 
     try:
         with open(log_path, "wb") as sink:
-            proc = subprocess.run(cmd, stdout=sink, stderr=subprocess.STDOUT,
-                                  stdin=subprocess.DEVNULL, timeout=timeout)
+            proc = subprocess.Popen(cmd, stdout=sink, stderr=subprocess.STDOUT,
+                                    stdin=subprocess.DEVNULL)
+            # 도우미가 로그에 흘리는 PRG| 줄을 읽어 진행 상황을 알린다.
+            # 파이프를 쓰면 타임아웃 때 교착이 생기므로 파일을 훔쳐본다.
+            deadline = time.monotonic() + timeout
+            reported = 0
+            while proc.poll() is None:
+                if time.monotonic() > deadline:
+                    proc.kill()
+                    raise subprocess.TimeoutExpired(cmd, timeout)
+                if on_progress:
+                    reported = _pump_progress(log_path, reported, on_progress)
+                time.sleep(0.4)
+            if on_progress:
+                _pump_progress(log_path, reported, on_progress)
         returncode = proc.returncode
     except subprocess.TimeoutExpired:
         _kill_pids(_list_pids(exe) - before)
-        name = os.path.basename(src)
+        name = os.path.basename(src) if src else "한글 문서"
+        # 도우미가 남긴 기록에서 어떤 창이 막았는지 건져낸다.
+        blocking = _dialogs_from_log(log_path)
         if visible:
             # 보안 모듈이 없어 창을 띄운 경우다. 대화상자에 막혔을 가능성이 크다.
             msg = [
                 f"'{name}' 변환이 {timeout}초를 넘겨 중단했습니다.",
                 "한글 창에 확인 대화상자가 떠 있었을 수 있습니다.",
                 "화면에 한글 창이 보이면 그 상자에 답한 뒤 다시 시도해 주세요.",
-                "계속 이러면 사용설명서의 '변환이 멈출 때' 항목을 봐 주세요.",
             ]
         else:
             msg = [
                 f"'{name}' 변환이 {timeout}초를 넘겨 중단했습니다.",
                 "프로그램이 응답하지 않는 상태이거나 문서가 너무 큽니다.",
-                "사용설명서의 '변환이 멈출 때' 항목을 봐 주세요.",
             ]
+        if blocking:
+            msg.append("")
+            msg.append("한글이 띄운 창: " + blocking)
+        msg.append("사용설명서의 '변환이 멈출 때' 항목을 봐 주세요.")
         raise ConversionError(chr(10).join(msg))
     finally:
         # 성공하든 실패하든 우리가 띄운 프로그램은 반드시 정리한다.
@@ -190,7 +280,7 @@ def _run_helper(src: str, dst: str, *, timeout: int, visible: bool) -> None:
             reason = "알 수 없는 오류"
         raise ConversionError(reason)
 
-    if not os.path.exists(dst):
+    if dst and not os.path.exists(dst):
         raise ConversionError(f"'{os.path.basename(src)}' 의 PDF 결과가 만들어지지 않았습니다.")
 
 

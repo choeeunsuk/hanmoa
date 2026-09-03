@@ -22,7 +22,9 @@ from typing import Any, Callable, Dict, List, Optional
 import pythoncom
 
 import exporters
-from converter import ConversionError, any_to_pdf
+from converter import (
+    HWP_EXTS, ConversionError, any_to_pdf, hwp_batch_to_pdf,
+)
 
 # 완료된 작업을 이 시간(초)이 지나면 결과 파일까지 지운다.
 JOB_TTL_SECONDS = 30 * 60
@@ -163,20 +165,50 @@ def make_merge_job(files: List[tuple[str, bytes]], *, bookmarks: bool = True) ->
     def run(j: Job) -> None:
         from pypdf import PdfReader, PdfWriter
 
-        pdf_paths: List[tuple[str, str]] = []
-        for i, (display, path) in enumerate(staged, start=1):
-            j.message = f"({i}/{len(staged)}) {display} 변환 중"
-            out = os.path.join(workdir, f"conv_{i:03d}.pdf")
+        # 결과 PDF 의 자리를 미리 정해 둔다. 순서는 사용자가 정한 그대로다.
+        outs = [os.path.join(workdir, f"conv_{i:03d}.pdf")
+                for i in range(1, len(staged) + 1)]
+        names = {os.path.basename(path): display for display, path in staged}
+
+        def restore_name(err: Exception) -> ConversionError:
+            """오류에 찍힌 임시 이름(000.hwp)을 사용자가 올린 이름으로 되돌린다."""
+            text = str(err)
+            for temp, display in names.items():
+                text = text.replace(temp, display)
+            return ConversionError(text)
+
+        # 한글 문서는 한 번에 몰아서 맡긴다. 한글을 처음 띄우는 데만 30초가
+        # 넘게 걸리기도 해서, 파일마다 새로 띄우면 그 값을 매번 치르게 된다.
+        hwp_jobs = [(path, outs[i]) for i, (display, path) in enumerate(staged)
+                    if os.path.splitext(path)[1].lower() in HWP_EXTS]
+
+        if hwp_jobs:
+            j.message = f"한글 문서 {len(hwp_jobs)}개 변환 준비 중"
+
+            def note(step: int, filename: str) -> None:
+                display = names.get(filename, filename)
+                j.message = f"({step}/{len(hwp_jobs)}) {display} 변환 중"
+
             try:
-                any_to_pdf(path, out)
+                hwp_batch_to_pdf(hwp_jobs, on_progress=note)
             except ConversionError as e:
-                # 변환기는 우리가 붙인 임시 이름(000.hwp)만 안다. 사용자가 올린
-                # 원래 이름으로 바꿔 줘야 어느 파일이 문제인지 알 수 있다.
-                raise ConversionError(
-                    str(e).replace(os.path.basename(path), display)
-                ) from e
-            pdf_paths.append((display, out))
-            j.progress = i
+                raise restore_name(e) from e
+            j.progress = len(hwp_jobs)
+
+        # 나머지(오피스·이미지·PDF)는 하나씩 처리한다.
+        for i, (display, path) in enumerate(staged):
+            if os.path.splitext(path)[1].lower() in HWP_EXTS:
+                continue
+            j.message = f"{display} 변환 중"
+            try:
+                any_to_pdf(path, outs[i])
+            except ConversionError as e:
+                raise restore_name(e) from e
+            j.progress = min(j.progress + 1, len(staged))
+
+        pdf_paths: List[tuple[str, str]] = [
+            (display, outs[i]) for i, (display, _) in enumerate(staged)
+        ]
 
         j.message = "PDF 병합 중"
         writer = PdfWriter()

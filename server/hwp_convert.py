@@ -22,6 +22,46 @@ from __future__ import annotations
 import os
 import sys
 
+# 이 프로세스의 출력은 부모가 파일로 받아 읽는다. 윈도우 파이썬은 화면이 아닌
+# 곳으로 내보낼 때 시스템 코드페이지(한국어 윈도우면 CP949)를 쓰는데, 부모는
+# UTF-8 로 읽으므로 한글 파일명이 깨진다. 양쪽을 UTF-8 로 맞춘다.
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
+except Exception:
+    pass
+
+
+def _hwp_pids() -> set:
+    """지금 떠 있는 Hwp.exe 의 PID 들. 우리가 새로 만든 것을 가려내는 데 쓴다."""
+    import subprocess
+    pids = set()
+    try:
+        out = subprocess.run(
+            ["tasklist", "/FI", "IMAGENAME eq Hwp.exe", "/FO", "CSV", "/NH"],
+            capture_output=True, timeout=15,
+        )
+        text = out.stdout.decode("utf-8", errors="ignore") or ""
+        if not text.strip():
+            text = out.stdout.decode("cp949", errors="ignore")
+        for line in text.splitlines():
+            cols = [c.strip().strip(chr(34)) for c in line.split(chr(34) + "," + chr(34))]
+            if len(cols) >= 2 and cols[0].lower() == "hwp.exe":
+                try:
+                    pids.add(int(cols[1]))
+                except ValueError:
+                    pass
+    except Exception:
+        pass
+    return pids
+
+
+def _dialog_note(watcher) -> str:
+    """감시 중 만난 대화상자를 오류 뒤에 덧붙일 문구로 만든다."""
+    if watcher is None or not watcher.seen:
+        return ""
+    return " / 한글이 띄운 창: " + watcher.report()
+
 
 def convert_office(src: str, dst: str) -> tuple[bool, str]:
     """Word/Excel/PowerPoint 문서를 PDF 로 저장한다."""
@@ -72,13 +112,115 @@ def convert_office(src: str, dst: str) -> tuple[bool, str]:
     return True, ""
 
 
+def run_batch(jobs, visible: bool) -> int:
+    """
+    한글을 한 번만 띄워 여러 문서를 차례로 PDF 로 만든다.
+
+    jobs 는 [[원본, 결과], ...] 형태다. 한 건이라도 실패하면 그 자리에서
+    멈추고 사유를 알린다. 병합에서는 한 장이 빠지면 결과가 틀리기 때문이다.
+    """
+    import win32com.client as wc
+
+    before = _hwp_pids()
+    try:
+        hwp = wc.DispatchEx("HWPFrame.HwpObject")
+    except Exception as e:
+        print(f"ERR|한컴오피스(한글)를 불러오지 못했습니다. 한글이 설치되어 있는지 확인해 주세요. ({e})")
+        return 1
+
+    mine = _hwp_pids() - before
+    watcher = None
+    if mine:
+        try:
+            from dialog_watch import DialogWatcher
+            watcher = DialogWatcher(next(iter(mine)))
+            watcher.__enter__()
+        except Exception:
+            watcher = None
+
+    try:
+        try:
+            hwp.RegisterModule("FilePathCheckDLL", "FilePathCheckerModule")
+        except Exception:
+            pass
+        if not visible:
+            try:
+                hwp.XHwpWindows.Item(0).Visible = False
+            except Exception:
+                pass
+
+        for i, pair in enumerate(jobs, start=1):
+            src, dst = pair[0], pair[1]
+            # 진행 상황을 흘려 둔다. 부모가 이걸 읽어 화면에 보여준다.
+            print(f"PRG|{i}|{os.path.basename(src)}", flush=True)
+
+            if hwp.Open(src, "", "forceopen:true") is False:
+                print(f"ERR|'{os.path.basename(src)}' 을(를) 열 수 없습니다. "
+                      "손상되었거나 DRM(문서 보안)이 걸린 파일일 수 있습니다."
+                      + _dialog_note(watcher))
+                return 1
+
+            if hwp.SaveAs(dst, "PDF", "") is False or not os.path.exists(dst):
+                print(f"ERR|'{os.path.basename(src)}' 을(를) PDF 로 저장하지 못했습니다."
+                      + _dialog_note(watcher))
+                return 1
+
+            # 다음 문서를 열기 전에 현재 문서를 비운다. 저장하지 않음(1).
+            try:
+                hwp.Clear(1)
+            except Exception:
+                pass
+
+        print("OK|")
+        return 0
+
+    except Exception as e:
+        print(f"ERR|변환 중 오류가 났습니다: {e}{_dialog_note(watcher)}")
+        return 1
+
+    finally:
+        if watcher is not None:
+            try:
+                watcher.__exit__(None, None, None)
+            except Exception:
+                pass
+        try:
+            hwp.Clear(1)
+        except Exception:
+            pass
+        try:
+            hwp.Quit()
+        except Exception:
+            pass
+
+
 def main() -> int:
+    """
+    인자 형태 두 가지:
+        hwp_convert.py <원본> <결과> [--visible]        한 건
+        hwp_convert.py --batch <목록.json> [--visible]  여러 건
+
+    여러 건을 한 번에 받는 이유: 한글을 처음 띄우는 데만 30초가 걸리기도 한다.
+    파일마다 새로 띄우면 그 값을 매번 치른다. 한 번 띄워 두고 여러 문서를
+    연달아 처리하면 두 번째부터는 몇 초면 끝난다.
+    """
     if len(sys.argv) < 3:
         print("ERR|사용법: hwp_convert.py <원본> <결과> [--visible]")
         return 2
 
+    visible = "--visible" in sys.argv
+
+    if sys.argv[1] == "--batch":
+        import json
+        try:
+            with open(sys.argv[2], encoding="utf-8") as fh:
+                jobs = json.load(fh)
+        except Exception as e:
+            print(f"ERR|변환 목록을 읽지 못했습니다: {e}")
+            return 1
+        return run_batch(jobs, visible)
+
     src, dst = sys.argv[1], sys.argv[2]
-    visible = "--visible" in sys.argv[3:]
 
     # 오피스 문서는 한글을 거치지 않는다.
     if os.path.splitext(src)[1].lower() in (".doc", ".docx", ".rtf", ".odt", ".txt",
@@ -93,11 +235,23 @@ def main() -> int:
         print("ERR|파이썬용 Windows 연결 구성요소(pywin32)가 없습니다. start.bat 을 다시 실행해 주세요.")
         return 1
 
+    before = _hwp_pids()
     try:
         hwp = wc.DispatchEx("HWPFrame.HwpObject")
     except Exception as e:
         print(f"ERR|한컴오피스(한글)를 불러오지 못했습니다. 한글이 설치되어 있는지 확인해 주세요. ({e})")
         return 1
+
+    # 우리가 방금 띄운 한글 프로세스를 찾아 그 창만 감시한다.
+    mine = _hwp_pids() - before
+    watcher = None
+    if mine:
+        try:
+            from dialog_watch import DialogWatcher
+            watcher = DialogWatcher(next(iter(mine)))
+            watcher.__enter__()
+        except Exception:
+            watcher = None
 
     try:
         # 파일 접근 보안 대화상자를 없애는 모듈. 등록되어 있지 않은 PC 도 있어서
@@ -118,21 +272,31 @@ def main() -> int:
         opened = hwp.Open(src, "", "forceopen:true")
         if opened is False:
             print(f"ERR|'{os.path.basename(src)}' 을(를) 열 수 없습니다. "
-                  "손상되었거나 DRM(문서 보안)이 걸린 파일일 수 있습니다.")
+                  "손상되었거나 DRM(문서 보안)이 걸린 파일일 수 있습니다."
+                  + _dialog_note(watcher))
             return 1
 
         if hwp.SaveAs(dst, "PDF", "") is False or not os.path.exists(dst):
-            print(f"ERR|'{os.path.basename(src)}' 을(를) PDF 로 저장하지 못했습니다.")
+            print(f"ERR|'{os.path.basename(src)}' 을(를) PDF 로 저장하지 못했습니다."
+                  + _dialog_note(watcher))
             return 1
 
         print("OK|")
         return 0
 
     except Exception as e:
-        print(f"ERR|변환 중 오류가 났습니다: {e}")
+        print(f"ERR|변환 중 오류가 났습니다: {e}{_dialog_note(watcher)}")
         return 1
 
     finally:
+        if watcher is not None:
+            try:
+                watcher.__exit__(None, None, None)
+                # 무슨 창을 만났는지는 성공했더라도 기록으로 남긴다.
+                if watcher.seen:
+                    print(f"DLG|{watcher.report()}")
+            except Exception:
+                pass
         try:
             hwp.Clear(1)          # 저장하지 않음 - 변경사항 확인 대화상자를 막는다
         except Exception:
