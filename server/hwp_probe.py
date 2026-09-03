@@ -181,12 +181,7 @@ def main() -> int:
         ok("위 항목이 모두 정상이면 한글 연결 자체는 문제가 없습니다")
 
     if src and os.path.exists(src):
-        step(f"창 숨기기")
-        try:
-            hwp.XHwpWindows.Item(0).Visible = False
-            ok("숨김")
-        except Exception as e:
-            ok(f"실패(무시 가능): {e}")
+        ok("창은 문서를 연 뒤에 감춥니다 (미리 감추면 구버전에서 멈춥니다)")
 
         step(f"문서 열기: {os.path.basename(src)}")
         ok("확인창이 뜨면 감시자가 «DLG|» 로 알리고 대신 눌러 줍니다")
@@ -202,6 +197,14 @@ def main() -> int:
             r = False
 
         if r is not False:
+            step("창 숨기기 (연 다음이라 안전합니다)")
+            try:
+                from hwp_convert import hide_window
+                hide_window(hwp)
+                ok("숨김")
+            except Exception as e:
+                ok(f"실패(무시 가능): {e}")
+
             dst = os.path.splitext(src)[0] + "_진단결과.pdf"
             step("PDF 로 저장 (판본마다 다른 방법을 차례로 시도합니다)")
             try:

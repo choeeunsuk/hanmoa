@@ -267,7 +267,10 @@ def _run_helper(src, dst, *, timeout: int, visible: bool,
         returncode = proc.returncode
     except subprocess.TimeoutExpired:
         _kill_pids(_list_pids(exe) - before)
-        name = os.path.basename(src) if src else "한글 문서"
+        # 일괄 처리 중이면 마지막으로 손대던 파일 이름을 쓴다.
+        # "한글 문서" 라고만 하면 어느 파일이 문제인지 알 수 없다.
+        last = _last_step_of(log_path)
+        name = os.path.basename(src) if src else (last[1] if last else "한글 문서")
         # 도우미가 남긴 기록에서 어떤 창이 막았는지 건져낸다.
         blocking = _dialogs_from_log(log_path)
         if visible:

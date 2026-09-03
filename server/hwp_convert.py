@@ -32,6 +32,20 @@ except Exception:
     pass
 
 
+def hide_window(hwp) -> None:
+    """
+    한글 창을 감춘다. 문서를 연 다음에 불러야 한다.
+
+    문서를 열기 전에 감추면 판본에 따라 Open 이 응답을 멈춘다(한글 10 세대에서
+    실측). 창을 만들어야 문서를 띄울 수 있는데 미리 감춰 버리면 그 자리에서
+    굳는 것으로 보인다. 그래서 열고 나서 감춘다. 잠깐 창이 비쳤다 사라진다.
+    """
+    try:
+        hwp.XHwpWindows.Item(0).Visible = False
+    except Exception:
+        pass
+
+
 def save_as_pdf(hwp, dst: str) -> tuple[bool, str]:
     """
     한글 문서를 PDF 로 저장한다. 판본마다 되는 방법이 달라 차례로 시도한다.
@@ -188,12 +202,6 @@ def run_batch(jobs, visible: bool) -> int:
             hwp.RegisterModule("FilePathCheckDLL", "FilePathCheckerModule")
         except Exception:
             pass
-        if not visible:
-            try:
-                hwp.XHwpWindows.Item(0).Visible = False
-            except Exception:
-                pass
-
         for i, pair in enumerate(jobs, start=1):
             src, dst = pair[0], pair[1]
             # 진행 상황을 흘려 둔다. 부모가 이걸 읽어 화면에 보여준다.
@@ -204,6 +212,10 @@ def run_batch(jobs, visible: bool) -> int:
                       "손상되었거나 DRM(문서 보안)이 걸린 파일일 수 있습니다."
                       + _dialog_note(watcher))
                 return 1
+
+            # 문서를 연 다음에 감춘다. 미리 감추면 구버전에서 Open 이 멈춘다.
+            if not visible:
+                hide_window(hwp)
 
             saved, why = save_as_pdf(hwp, dst)
             if not saved:
@@ -308,12 +320,6 @@ def main() -> int:
         except Exception:
             pass
 
-        if not visible:
-            try:
-                hwp.XHwpWindows.Item(0).Visible = False
-            except Exception:
-                pass
-
         # 반드시 3-인자 형식으로 부른다. 한 인자짜리 Open(path) 은 응답 없이 멈추고,
         # arg 문자열에 versionwarning 같은 미지원 옵션을 넣어도 똑같이 멈춘다.
         opened = hwp.Open(src, "", "forceopen:true")
@@ -322,6 +328,10 @@ def main() -> int:
                   "손상되었거나 DRM(문서 보안)이 걸린 파일일 수 있습니다."
                   + _dialog_note(watcher))
             return 1
+
+        # 문서를 연 다음에 감춘다. 미리 감추면 구버전에서 Open 이 멈춘다.
+        if not visible:
+            hide_window(hwp)
 
         saved, why = save_as_pdf(hwp, dst)
         if not saved:
