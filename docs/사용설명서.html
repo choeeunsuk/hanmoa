@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>한모아 사용설명서</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm 16mm; }
+
+  * { box-sizing: border-box; }
+
+  body {
+    font-family: "Malgun Gothic", "맑은 고딕", sans-serif;
+    font-size: 10pt;
+    line-height: 1.62;
+    color: #1a1a1a;
+    margin: 0;
+  }
+
+  /* ── 표지 ───────────────────────────── */
+  .cover {
+    height: 245mm;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    text-align: center;
+    page-break-after: always;
+  }
+  .cover .mark {
+    width: 78px; height: 78px; margin: 0 auto 26px;
+    background: #d92d20; color: #fff;
+    border-radius: 20px;
+    font-size: 40px; font-weight: 700;
+    line-height: 78px;
+  }
+  .cover h1 { font-size: 34pt; margin: 0; letter-spacing: -1px; }
+  .cover .sub { font-size: 13pt; color: #667085; margin-top: 14px; }
+  .cover .line { width: 54px; height: 3px; background: #d92d20; margin: 32px auto; }
+  .cover .desc { font-size: 11pt; color: #475467; line-height: 2; }
+  .cover .foot { margin-top: 46px; font-size: 9.5pt; color: #98a2b3; }
+
+  /* ── 본문 구조 ───────────────────────── */
+  h2 {
+    font-size: 17pt; margin: 0 0 4px;
+    padding-bottom: 9px; border-bottom: 2.5px solid #d92d20;
+    page-break-after: avoid;
+  }
+  h4 + p, h3 + p { page-break-before: avoid; }
+  h2 .num {
+    display: inline-block; min-width: 30px; height: 30px;
+    background: #d92d20; color: #fff; border-radius: 8px;
+    font-size: 12pt; text-align: center; line-height: 30px;
+    margin-right: 10px; padding: 0 8px;
+  }
+  h3 {
+    font-size: 12pt; margin: 18px 0 6px; color: #b42318;
+    page-break-after: avoid;
+  }
+  h4 { font-size: 10.5pt; margin: 13px 0 4px; page-break-after: avoid; }
+  p { margin: 6px 0; orphans: 3; widows: 3; }
+  .section { page-break-before: always; }
+  .lead { color: #475467; margin-bottom: 16px; }
+
+  /* ── 단계 목록 ───────────────────────── */
+  ol.steps { counter-reset: s; list-style: none; padding: 0; margin: 14px 0; }
+  ol.steps > li {
+    counter-increment: s; position: relative;
+    padding: 0 0 11px 36px; margin: 0;
+    page-break-inside: avoid;
+  }
+  ol.steps > li::before {
+    content: counter(s);
+    position: absolute; left: 0; top: 1px;
+    width: 25px; height: 25px;
+    background: #1a1a1a; color: #fff; border-radius: 50%;
+    font-size: 10pt; font-weight: 700;
+    text-align: center; line-height: 25px;
+  }
+  ol.steps > li b { display: block; margin-bottom: 2px; }
+  ol.tight { margin: 8px 0; padding-left: 22px; }
+  ol.tight li { margin: 3px 0; }
+  ol.tight .note { color: #667085; font-size: 9.5pt; }
+  ol.steps > li .note { color: #667085; font-size: 9.5pt; }
+
+  /* ── 상자 ───────────────────────────── */
+  .box {
+    border: 1px solid #e4e7ec; border-left: 4px solid #98a2b3;
+    background: #f9fafb; border-radius: 6px;
+    padding: 11px 15px; margin: 12px 0;
+    page-break-inside: avoid;
+  }
+  .box .t { font-weight: 700; margin-bottom: 4px; }
+  .box p { margin: 4px 0; }
+  .warn { border-left-color: #d92d20; background: #fef3f2; }
+  .warn .t { color: #b42318; }
+  .tip  { border-left-color: #12b76a; background: #f0fdf4; }
+  .tip .t { color: #027a48; }
+
+  /* ── 표 ─────────────────────────────── */
+  table {
+    width: 100%; border-collapse: collapse; margin: 12px 0;
+    font-size: 9.5pt; page-break-inside: avoid;
+  }
+  th, td { border: 1px solid #e4e7ec; padding: 6.5px 10px; text-align: left; vertical-align: top; }
+  th { background: #f2f4f7; font-weight: 700; }
+  td.c, th.c { text-align: center; }
+
+  /* ── 강조 요소 ───────────────────────── */
+  code {
+    font-family: Consolas, "D2Coding", monospace;
+    background: #f2f4f7; padding: 1.5px 5px; border-radius: 3px;
+    font-size: 9.5pt; color: #b42318;
+  }
+  .url {
+    display: block; font-family: Consolas, monospace;
+    background: #1a1a1a; color: #fff;
+    padding: 11px 16px; border-radius: 6px;
+    margin: 12px 0; font-size: 11pt; text-align: center;
+    word-break: break-all;
+  }
+  .key {
+    display: inline-block; border: 1px solid #d0d5dd; border-bottom-width: 2px;
+    border-radius: 4px; padding: 0 6px; background: #fff;
+    font-family: Consolas, monospace; font-size: 9.5pt;
+  }
+  .big-check {
+    background: #fff; border: 2px solid #d92d20; border-radius: 8px;
+    padding: 14px 18px; margin: 16px 0; page-break-inside: avoid;
+  }
+  .big-check .t { color: #b42318; font-weight: 700; font-size: 11.5pt; margin-bottom: 6px; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════ 표지 ═══════════ -->
+<div class="cover">
+  <div class="mark">한</div>
+  <h1>한모아 사용설명서</h1>
+  <div class="sub">한글 파일까지 병합되는 무료 PDF 도구</div>
+  <div class="line"></div>
+  <div class="desc">
+    한글(HWP) 문서 여러 개를 하나의 PDF로 묶습니다.<br>
+    PDF 병합 · 분할 · 압축 · 글자인식 등 28가지 도구를 담았습니다.<br>
+    <b>파일이 인터넷으로 전송되지 않습니다.</b>
+  </div>
+  <div class="foot">
+    무료 · 오픈소스<br>
+    github.com/choeeunsuk/hanmoa
+  </div>
+</div>
+
+<!-- ═══════════ 1. 두 가지 방법 ═══════════ -->
+<div class="section">
+<h2><span class="num">1</span>먼저, 두 가지 방법 중 하나를 고르세요</h2>
+<p class="lead">한모아는 두 가지로 쓸 수 있습니다. 하시려는 일에 따라 고르시면 됩니다.</p>
+
+<table>
+  <tr>
+    <th style="width:34%"></th>
+    <th class="c" style="width:33%">웹으로 바로 쓰기</th>
+    <th class="c" style="width:33%">내 컴퓨터에 설치</th>
+  </tr>
+  <tr>
+    <td><b>준비물</b></td>
+    <td class="c">없음</td>
+    <td class="c">한컴오피스 + Python</td>
+  </tr>
+  <tr>
+    <td><b>걸리는 시간</b></td>
+    <td class="c">0분</td>
+    <td class="c">10분 (처음 한 번)</td>
+  </tr>
+  <tr>
+    <td>PDF 병합 · 분할 · 압축</td>
+    <td class="c">가능</td>
+    <td class="c">가능</td>
+  </tr>
+  <tr>
+    <td>스캔 문서 글자인식(OCR)</td>
+    <td class="c">가능</td>
+    <td class="c">가능</td>
+  </tr>
+  <tr>
+    <td>서명 넣기 · 내용 지우기</td>
+    <td class="c">가능</td>
+    <td class="c">가능</td>
+  </tr>
+  <tr style="background:#fef3f2">
+    <td><b>한글(HWP) 파일 병합</b></td>
+    <td class="c"><b>불가능</b></td>
+    <td class="c"><b>가능</b></td>
+  </tr>
+  <tr>
+    <td>워드 · 엑셀 · PPT 변환</td>
+    <td class="c">불가능</td>
+    <td class="c">가능</td>
+  </tr>
+</table>
+
+<div class="tip box">
+  <div class="t">이렇게 고르세요</div>
+  <p><b>PDF 작업만 하신다면</b> → 웹으로 쓰세요. 설치할 것이 없습니다.</p>
+  <p><b>한글 문서를 묶어야 한다면</b> → 내 컴퓨터에 설치하세요. 3장을 보시면 됩니다.</p>
+</div>
+
+<h3>웹으로 바로 쓰기</h3>
+<p>아래 주소를 브라우저에 입력하면 끝입니다. 가입도, 설치도 필요 없습니다.</p>
+<div class="url">https://choeeunsuk.github.io/hanmoa/</div>
+<p>즐겨찾기에 넣어 두시면 편합니다.</p>
+
+<div class="box">
+  <div class="t">왜 한글 병합만 웹에서 안 되나요?</div>
+  <p>한글 문서를 PDF로 바꾸려면 컴퓨터에 설치된 한컴오피스를 직접 불러야 합니다.
+  그런데 브라우저는 보안 때문에 웹사이트가 내 컴퓨터의 프로그램을 마음대로 실행하지
+  못하게 막습니다. 그래서 이 기능만 내 컴퓨터에서 돌리는 프로그램이 필요합니다.</p>
+</div>
+</div>
+
+<!-- ═══════════ 2. 웹 도구 사용법 ═══════════ -->
+<div class="section">
+<h2><span class="num">2</span>웹에서 도구 쓰는 법</h2>
+<p class="lead">모든 도구가 같은 방식으로 동작합니다. 한 번만 익히면 28가지를 다 쓰실 수 있습니다.</p>
+
+<ol class="steps">
+  <li>
+    <b>첫 화면에서 도구를 고릅니다</b>
+    <span class="note">PDF 병합, 분할, 압축처럼 하시려는 일이 카드로 나열되어 있습니다.</span>
+  </li>
+  <li>
+    <b>파일을 끌어다 놓거나 «파일 선택»을 누릅니다</b>
+    <span class="note">여러 개를 한 번에 올릴 수 있는 도구도 있습니다.</span>
+  </li>
+  <li>
+    <b>오른쪽 «설정»에서 원하는 대로 맞춥니다</b>
+    <span class="note">그대로 두셔도 됩니다. 대부분 기본값이 무난합니다.</span>
+  </li>
+  <li>
+    <b>빨간 버튼을 누릅니다</b>
+    <span class="note">처리가 끝나면 파일이 자동으로 저장됩니다.</span>
+  </li>
+</ol>
+
+<h3>자주 쓰는 도구</h3>
+
+<h4>PDF 병합 — 여러 PDF를 하나로</h4>
+<p>파일을 올린 뒤 <b>카드를 마우스로 끌어 순서를 바꿀 수 있습니다.</b>
+카드 왼쪽 위 번호가 합쳐질 순서입니다. «파일 이름으로 목차 만들기»를 켜두면
+완성된 PDF 왼쪽에 목차가 생겨 문서 사이를 오가기 편합니다.</p>
+
+<h4>페이지 정리 — 순서 바꾸기 · 회전 · 삭제를 한 화면에서</h4>
+<p>PDF를 올리면 모든 쪽이 펼쳐집니다. 각 쪽 아래 단추로 돌리거나 뺄 수 있고,
+쪽을 끌어서 순서를 바꿉니다. 잘못 건드렸으면 «되돌리기»를 누르면 처음으로 돌아갑니다.</p>
+
+<h4>스캔 문서 글자 인식(OCR) — 검색되는 PDF로</h4>
+<p>스캔한 PDF나 사진을 올리면 글자를 읽어냅니다. 결과물은 겉보기엔 원본과 같지만
+<span class="key">Ctrl</span> + <span class="key">F</span> 로 단어를 찾을 수 있고 복사도 됩니다.
+글씨가 작거나 흐리면 «인식 해상도»를 «정확»으로 올려 보세요.</p>
+
+<h4>내용 지우기 — 개인정보를 진짜로 삭제</h4>
+<p>가릴 곳을 마우스로 끌어 상자를 그리면 됩니다.</p>
+<div class="warn box">
+  <div class="t">검은 사각형을 덧그리는 것과 다릅니다</div>
+  <p>다른 프로그램에서 검은 네모를 얹는 방식은 글자가 그대로 남아 있어 복사하면 읽힙니다.
+  한모아는 그 쪽을 통째로 그림으로 다시 만들어 <b>가린 내용이 실제로 사라집니다.</b>
+  대신 그 쪽은 글자 검색이 되지 않습니다.</p>
+</div>
+
+<h4>서명 넣기 — 결재란에 이름을</h4>
+<p>오른쪽 칸에 마우스로 서명을 그린 뒤 «이 서명 사용»을 누르고,
+문서에서 넣을 자리를 클릭합니다. 넣은 뒤에는 끌어서 옮기고 모서리를 잡아 크기를 바꿉니다.
+도장 이미지 파일을 올려서 쓰셔도 됩니다.</p>
+</div>
+
+<!-- ═══════════ 3. 설치 ═══════════ -->
+<div class="section">
+<h2><span class="num">3</span>내 컴퓨터에 설치하기</h2>
+<p class="lead">한글(HWP) 병합을 쓰시려면 이 과정이 필요합니다. 처음 한 번만 하면 됩니다.</p>
+
+<div class="box">
+  <div class="t">준비물</div>
+  <p><b>Windows</b> · <b>한컴오피스(한글)</b> — 한글 문서를 PDF로 바꾸는 데 필요합니다<br>
+  워드 · 엑셀 · PPT 변환까지 쓰시려면 Microsoft Office도 있어야 합니다.</p>
+</div>
+
+<h3>1단계 — 파일 내려받기</h3>
+<ol class="steps">
+  <li>
+    <b>아래 주소로 들어갑니다</b>
+    <div class="url" style="margin:8px 0">https://github.com/choeeunsuk/hanmoa</div>
+  </li>
+  <li>
+    <b>초록색 «Code» 단추 → «Download ZIP»</b>
+    <span class="note">화면 오른쪽 위에 있습니다.</span>
+  </li>
+  <li>
+    <b>내려받은 ZIP 파일의 압축을 풉니다</b>
+    <span class="note">바탕화면이나 문서 폴더 등 원하는 곳에 푸시면 됩니다.</span>
+  </li>
+</ol>
+
+<div class="tip box">
+  <div class="t">압축 풀기 전에 하면 좋은 것</div>
+  <p>내려받은 ZIP 파일에 <b>마우스 오른쪽 → 속성</b>을 누르면 아래쪽에
+  «차단 해제» 체크칸이 보일 때가 있습니다. 체크하고 «확인»을 누른 뒤 압축을 푸시면,
+  나중에 «Windows가 PC를 보호했습니다» 같은 경고가 뜨지 않습니다.</p>
+</div>
+
+<h3>2단계 — Python 설치</h3>
+<p>한모아를 돌리는 데 쓰이는 무료 프로그램입니다. 이미 설치되어 있다면 3단계로 넘어가세요.</p>
+
+<ol class="steps">
+  <li>
+    <b>python.org 에 들어갑니다</b>
+    <div class="url" style="margin:8px 0">https://www.python.org/downloads/</div>
+  </li>
+  <li>
+    <b>노란색 «Download Python» 단추를 누릅니다</b>
+  </li>
+  <li>
+    <b>내려받은 설치 파일을 실행합니다</b>
+  </li>
+  <li>
+    <b>설치 첫 화면 맨 아래를 꼭 확인하세요</b>
+    <div class="big-check">
+      <div class="t">☑ Add python.exe to PATH</div>
+      이 체크칸을 반드시 켜고 «Install Now»를 누르세요.<br>
+      <b>이것을 놓치면 설치하고도 한모아가 Python을 찾지 못합니다.</b>
+      그때는 Python을 지우고 처음부터 다시 설치해야 합니다.
+    </div>
+  </li>
+</ol>
+
+<h3>Python을 설치했는데도 못 찾는다면</h3>
+<p>원인은 대개 둘 중 하나입니다.</p>
+
+<h4>가) «Add python.exe to PATH»를 체크하지 않았다</h4>
+<p>Python을 지우고 다시 설치하면서 그 체크칸을 켜세요. (3장 2단계 참고)</p>
+<h4>나) Windows의 껍데기 python이 가로막고 있다</h4>
+<p>Windows에는 진짜 Python이 없어도 <code>python.exe</code> 라는 이름만 있는 껍데기가
+들어 있습니다. 실행하면 Microsoft Store만 열립니다.</p>
+<ol class="tight">
+  <li>«설정»을 엽니다 <span class="note">시작 단추 → 톱니바퀴</span></li>
+  <li>«앱 실행 별칭»을 검색해 들어갑니다</li>
+  <li><code>python.exe</code> 와 <code>python3.exe</code> 를 끕니다</li>
+  <li>python.org에서 다시 설치합니다</li>
+</ol>
+
+<h3>3단계 — 실행</h3>
+<ol class="steps">
+  <li>
+    <b>압축을 푼 폴더에서 <code>start.bat</code> 을 더블클릭합니다</b>
+  </li>
+  <li>
+    <b>«Windows의 PC 보호» 경고가 뜨면</b>
+    <span class="note">«추가 정보» → «실행»을 누르세요. 처음 한 번만 나옵니다.</span>
+  </li>
+  <li>
+    <b>검은 창이 열리고 구성요소를 자동으로 설치합니다</b>
+    <span class="note">2~3분 걸립니다. 이때만 인터넷이 필요합니다.</span>
+  </li>
+  <li>
+    <b>브라우저가 저절로 열립니다</b>
+    <span class="note">안 열리면 주소창에 localhost:8765 를 입력하세요.</span>
+  </li>
+</ol>
+
+<div class="warn box">
+  <div class="t">검은 창을 닫지 마세요</div>
+  <p>그 창이 한모아를 돌리고 있습니다. 닫으면 사이트도 함께 꺼집니다.
+  <b>최소화해 두세요.</b> 다 쓰신 뒤에는 닫으시면 됩니다.</p>
+  <p>다음부터는 <code>start.bat</code> 을 더블클릭하면 바로 열립니다.
+  설치 과정은 다시 거치지 않습니다.</p>
+</div>
+</div>
+
+<!-- ═══════════ 4. 한글 병합 ═══════════ -->
+<div class="section">
+<h2><span class="num">4</span>한글 파일 병합하기</h2>
+<p class="lead">이 프로그램을 만든 이유입니다. 한글 문서 여러 개를 하나의 PDF로 묶습니다.</p>
+
+<ol class="steps">
+  <li>
+    <b>첫 화면 «한글·오피스»에서 «한글 파일 병합»을 누릅니다</b>
+    <span class="note">화면 오른쪽 위 표시가 초록색 «엔진 연결됨»이어야 합니다.</span>
+  </li>
+  <li>
+    <b>한글 파일들을 끌어다 놓습니다</b>
+    <span class="note">HWP, HWPX는 물론 워드·PDF·이미지도 섞어서 넣을 수 있습니다.</span>
+  </li>
+  <li>
+    <b>카드를 끌어 합쳐질 순서를 정합니다</b>
+    <span class="note">카드 왼쪽 위 번호가 순서입니다.</span>
+  </li>
+  <li>
+    <b>«한글 파일 병합» 단추를 누릅니다</b>
+    <span class="note">문서 하나당 2~5초 걸립니다. 진행 상황이 화면에 표시됩니다.</span>
+  </li>
+</ol>
+
+<h3>이렇게 만들어집니다</h3>
+<table>
+  <tr>
+    <th style="width:30%">항목</th>
+    <th>내용</th>
+  </tr>
+  <tr>
+    <td><b>서식</b></td>
+    <td>한컴오피스가 직접 변환하므로 표·수식·글맵시가 원본 그대로 나옵니다.</td>
+  </tr>
+  <tr>
+    <td><b>쪽 나눔</b></td>
+    <td>각 문서가 항상 새 쪽에서 시작합니다. 앞 문서의 마지막 쪽이 비어 있어도 뒤 문서가 이어붙지 않습니다.</td>
+  </tr>
+  <tr>
+    <td><b>목차</b></td>
+    <td>파일 이름으로 목차(북마크)가 자동으로 만들어집니다. PDF 왼쪽 패널에서 문서 사이를 오갈 수 있습니다.</td>
+  </tr>
+</table>
+
+<div class="warn box">
+  <div class="t">DRM(문서 보안)이 걸린 한글 파일은 열 수 없습니다</div>
+  <p>보안 문서는 한컴오피스가 자동 변환을 거부합니다.
+  한글에서 파일을 열어 «다른 이름으로 저장»으로 보안을 푼 뒤 사용해 주세요.</p>
+</div>
+
+<div class="box">
+  <div class="t">문서를 여는 창이 잠깐씩 보일 수 있습니다</div>
+  <p>한글 프로그램을 불러 변환하기 때문입니다. 작업이 끝나면 저절로 정리됩니다.
+  <b>변환 중에 한글 프로그램을 따로 조작하지 마세요.</b>
+  이미 열어 두신 한글 문서는 영향을 받지 않습니다.</p>
+</div>
+</div>
+
+<!-- ═══════════ 5. 문제 해결 ═══════════ -->
+<div class="section">
+<h2><span class="num">5</span>잘 안 될 때</h2>
+
+<h3>사이트가 열리지 않습니다 (연결이 거부되었습니다)</h3>
+<p>검은 창이 꺼져 있는 것입니다. <code>start.bat</code> 을 다시 더블클릭하세요.
+인터넷·와이파이 문제가 아닙니다. 한모아는 내 컴퓨터 안에서만 통신하므로
+<b>인터넷이 없어도 동작합니다.</b></p>
+
+<h3>한글 도구가 잠겨 있습니다</h3>
+<p>화면 오른쪽 위 표시를 보세요.</p>
+<table>
+  <tr><th style="width:26%">표시</th><th>뜻</th></tr>
+  <tr><td><b>엔진 연결됨</b> (초록)</td><td>정상입니다. 모든 도구를 쓸 수 있습니다.</td></tr>
+  <tr><td><b>웹판</b> (회색)</td><td>웹 주소로 들어오셨습니다. 한글 병합은 설치가 필요합니다.</td></tr>
+  <tr><td><b>엔진 없음</b> (회색)</td><td>검은 창이 꺼져 있습니다. <code>start.bat</code> 을 실행하세요.</td></tr>
+</table>
+
+<h3>«설치에 실패했습니다» 라고 나옵니다</h3>
+<p>같은 폴더의 <code>진단.bat</code> 을 더블클릭하면 무엇이 막혔는지 알려줍니다.
+<b>[4] 패키지 서버 접속 시험</b> 부분을 보세요.</p>
+
+<table>
+  <tr>
+    <th style="width:38%">화면에 보이는 글자</th>
+    <th>뜻과 해결 방법</th>
+  </tr>
+  <tr>
+    <td><code>Saved</code> <code>Downloading</code></td>
+    <td>네트워크는 정상입니다. 화면을 캡처해 문의하세요.</td>
+  </tr>
+  <tr>
+    <td><code>ProxyError</code> <code>SSLError</code><br><code>timed out</code></td>
+    <td><b>학교 방화벽이 막고 있습니다.</b> 휴대폰 핫스팟에 연결해 한 번만
+    설치하세요. 이후로는 인터넷이 필요 없습니다.</td>
+  </tr>
+  <tr>
+    <td><code>Permission denied</code><br><code>WinError 5</code></td>
+    <td>권한이 부족합니다. <code>start.bat</code> 에 오른쪽 클릭 →
+    «관리자 권한으로 실행».</td>
+  </tr>
+  <tr>
+    <td><code>Python was not found</code><br>또는 <code>Python</code> 한 단어만</td>
+    <td><b>Windows의 껍데기가 잡힌 것입니다.</b> 3장 끝 부분을 보세요.</td>
+  </tr>
+</table>
+
+</div>
+
+<!-- ═══════════ 6. 안전성 ═══════════ -->
+<div class="section">
+<h2><span class="num">6</span>내 문서는 안전한가요</h2>
+
+<div class="tip box">
+  <div class="t">파일이 인터넷으로 전송되지 않습니다</div>
+  <p>PDF 작업과 글자 인식은 모두 <b>브라우저 안에서</b> 처리됩니다.
+  한글·오피스 변환은 <b>내 컴퓨터에서 도는 프로그램</b>이 처리합니다.
+  어느 쪽이든 문서가 외부로 나가지 않습니다.</p>
+</div>
+
+<table>
+  <tr><th style="width:34%">항목</th><th>내용</th></tr>
+  <tr>
+    <td><b>업로드</b></td>
+    <td>없습니다. 서버에 파일을 보내지 않습니다.</td>
+  </tr>
+  <tr>
+    <td><b>접근 범위</b></td>
+    <td>프로그램은 <code>127.0.0.1</code>(내 컴퓨터 자신)에만 열립니다.
+    같은 네트워크의 다른 컴퓨터도 접근할 수 없습니다.</td>
+  </tr>
+  <tr>
+    <td><b>임시 파일</b></td>
+    <td>변환에 쓴 임시 파일은 작업이 끝나면 자동으로 지워집니다.</td>
+  </tr>
+  <tr>
+    <td><b>인터넷</b></td>
+    <td>처음 설치할 때만 필요합니다. 그 뒤로는 인터넷 없이 동작합니다.</td>
+  </tr>
+  <tr>
+    <td><b>회원가입</b></td>
+    <td>없습니다. 개인정보를 수집하지 않습니다.</td>
+  </tr>
+</table>
+
+<h3>담긴 도구 28가지</h3>
+<table>
+  <tr>
+    <td style="width:26%; background:#f9fafb"><b>한글·오피스</b></td>
+    <td>한글 파일 병합 · 문서를 PDF로</td>
+  </tr>
+  <tr>
+    <td style="background:#f9fafb"><b>PDF 정리</b></td>
+    <td>병합 · 분할 · 페이지 추출 · 페이지 삭제 · 페이지 정리 · 회전 · 여백 자르기</td>
+  </tr>
+  <tr>
+    <td style="background:#f9fafb"><b>변환</b></td>
+    <td>이미지를 PDF로 · PDF를 이미지로 · 글자 인식(OCR) · 카메라로 스캔 ·
+    PDF를 Word로 · PDF를 Excel로 · PDF를 PowerPoint로 · 웹페이지를 PDF로</td>
+  </tr>
+  <tr>
+    <td style="background:#f9fafb"><b>편집</b></td>
+    <td>페이지 번호 · 워터마크 · 서명 넣기 · 글자 넣기</td>
+  </tr>
+  <tr>
+    <td style="background:#f9fafb"><b>최적화·보안</b></td>
+    <td>내용 지우기 · 압축 · PDF 비교 · 암호 걸기 · 암호 해제 · PDF/A 변환 · PDF 복구</td>
+  </tr>
+</table>
+
+<div class="box" style="margin-top:28px; text-align:center">
+  <p style="margin:2px 0"><b>한모아 (Hanmoa)</b> · 무료 · 오픈소스</p>
+  <p style="margin:2px 0; font-size:9.5pt; color:#667085">
+    웹으로 쓰기 &nbsp;https://choeeunsuk.github.io/hanmoa/<br>
+    내려받기 &nbsp;https://github.com/choeeunsuk/hanmoa
+  </p>
+  <p style="margin:10px 0 2px; font-size:9pt; color:#98a2b3">
+    독립적인 오픈소스 프로젝트입니다. 한글과컴퓨터, Microsoft를 비롯한
+    어떤 회사와도 제휴하거나 후원받지 않았습니다.<br>
+    각 상표는 해당 소유자의 자산입니다.
+  </p>
+</div>
+</div>
+
+</body>
+</html>
