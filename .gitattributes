@@ -6,6 +6,9 @@
 *.bat text eol=crlf
 *.cmd text eol=crlf
 
+# 메모장으로 여는 안내문. LF 로 내려가면 구형 메모장에서 한 줄로 뭉친다.
+*.txt text eol=crlf
+
 # 아래는 손대지 말 것 (바이너리)
 *.gz          binary
 *.traineddata binary
