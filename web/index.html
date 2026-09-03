@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>한모아 — 한글까지 되는 무료 PDF 도구</title>
+<meta name="description" content="PDF 병합·분할·압축·변환을 브라우저 안에서 처리하는 무료 오픈소스 도구. 한글(HWP) 파일 여러 개를 하나의 PDF로 병합할 수 있습니다.">
+<link rel="stylesheet" href="css/style.css?v=17">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📄</text></svg>">
+</head>
+<body>
+
+<header class="site-header">
+  <a class="brand" href="#/" aria-label="홈">
+    <span class="brand-mark">한</span>
+    <span class="brand-name">한모아</span>
+  </a>
+  <nav class="site-nav">
+    <a href="#/" class="nav-link">모든 도구</a>
+    <a href="#/tool/hwp-merge" class="nav-link nav-link-accent">한글 병합</a>
+  </nav>
+  <div class="engine-badge" id="engineBadge" title="로컬 변환 엔진 상태">
+    <span class="engine-dot"></span><span class="engine-text">엔진 확인 중</span>
+  </div>
+</header>
+
+<!-- ─────────────── 홈: 도구 목록 ─────────────── -->
+<main id="viewHome" class="view">
+  <section class="hero">
+    <h1>모든 PDF 작업을 <em>브라우저 안에서</em></h1>
+    <p class="hero-sub">
+      파일이 서버로 올라가지 않습니다. 변환은 여러분의 컴퓨터에서 끝납니다.<br>
+      그리고 <strong>한글(HWP) 문서 여러 개를 하나의 PDF로</strong> 묶을 수 있습니다.
+    </p>
+  </section>
+  <div id="toolGrid" class="tool-grid"></div>
+  <section class="privacy-note">
+    <h2>왜 안전한가요?</h2>
+    <p>
+      PDF 병합·분할·압축·회전·워터마크·암호 설정은 전부 <strong>브라우저 자바스크립트</strong>로 처리합니다.
+      파일이 네트워크를 타지 않으므로 업로드도, 서버 보관도 없습니다.
+      한글·오피스 문서 변환만은 한컴오피스/MS Office가 설치된 <strong>내 PC의 로컬 엔진</strong>이 담당하며,
+      이때도 파일은 내 컴퓨터 밖으로 나가지 않고 작업이 끝나면 자동 삭제됩니다.
+    </p>
+  </section>
+</main>
+
+<!-- ─────────────── 작업 화면 ─────────────── -->
+<main id="viewTool" class="view" hidden>
+  <div class="tool-head">
+    <a href="#/" class="back-link">← 모든 도구</a>
+    <h1 id="toolTitle"></h1>
+    <p id="toolDesc" class="tool-desc"></p>
+  </div>
+
+  <div class="workspace">
+    <div class="workspace-main">
+      <div id="dropzone" class="dropzone" tabindex="0" role="button">
+        <svg class="dz-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0L8 8m4-4 4 4M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+        <p class="dz-title">파일을 여기에 끌어다 놓으세요</p>
+        <p class="dz-sub" id="dzSub"></p>
+        <button type="button" class="btn btn-primary" id="pickBtn">파일 선택</button>
+        <input type="file" id="fileInput" hidden>
+      </div>
+      <div id="fileList" class="file-list" hidden></div>
+      <p class="hint" id="sortHint" hidden>카드를 끌어서 순서를 바꿀 수 있습니다.</p>
+
+      <div id="pageBar" class="page-bar" hidden>
+        <span id="pageStat" class="page-stat"></span>
+        <span class="page-bar-actions">
+          <button type="button" class="btn btn-ghost btn-sm" id="rotAllLeft">전체 ↺</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="rotAllRight">전체 ↻</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="restoreAll">되돌리기</button>
+        </span>
+      </div>
+      <div id="pageGrid" class="page-grid" hidden></div>
+
+      <div id="scanner" class="scanner" hidden>
+        <div class="scan-view">
+          <video id="scanVideo" playsinline muted></video>
+        </div>
+        <p class="hint" id="scanMsg"></p>
+        <div class="scan-actions">
+          <button type="button" class="btn btn-primary btn-sm" id="scanStart">카메라 켜기</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="scanShot" disabled>촬영</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="scanClear">모두 버리기</button>
+          <select id="scanDevice" hidden aria-label="카메라 선택"></select>
+        </div>
+        <div id="scanShots" class="scan-shots"></div>
+      </div>
+
+      <div id="editor" class="editor" hidden>
+        <div class="editor-bar">
+          <span class="editor-nav">
+            <button type="button" class="btn btn-ghost btn-sm" id="editPrev">‹ 이전</button>
+            <span id="editPageLabel" class="page-stat"></span>
+            <button type="button" class="btn btn-ghost btn-sm" id="editNext">다음 ›</button>
+          </span>
+          <button type="button" class="btn btn-ghost btn-sm" id="editClear">올린 것 모두 지우기</button>
+        </div>
+        <p class="hint" id="editHint"></p>
+        <div class="edit-stage" id="editStage">
+          <div class="edit-canvas" id="editCanvas"></div>
+          <div class="edit-layer" id="editLayer"></div>
+        </div>
+      </div>
+    </div>
+
+    <aside class="workspace-side">
+      <h2 id="optionTitle">설정</h2>
+
+      <div id="signBox" class="sign-box" hidden>
+        <label class="sign-label">여기에 서명을 그리세요</label>
+        <canvas id="signPad" class="sign-pad"></canvas>
+        <div class="sign-actions">
+          <button type="button" class="btn btn-ghost btn-sm" id="signClear">지우기</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="signUploadBtn">그림 올리기</button>
+          <input type="file" id="signUpload" accept="image/*" hidden>
+        </div>
+        <button type="button" class="btn btn-primary btn-sm sign-use" id="signUse">이 서명 사용</button>
+        <p class="sign-state" id="signState"></p>
+      </div>
+
+      <div id="optionPanel" class="option-panel"></div>
+      <button type="button" class="btn btn-action" id="runBtn" disabled>실행</button>
+      <p class="side-note" id="sideNote"></p>
+    </aside>
+  </div>
+</main>
+
+<!-- ─────────────── 진행 / 결과 ─────────────── -->
+<div id="overlay" class="overlay" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="ovTitle">
+    <div id="ovBusy">
+      <div class="spinner" aria-hidden="true"></div>
+      <h2 id="ovTitle">처리 중…</h2>
+      <p id="ovMsg" class="ov-msg"></p>
+      <div class="bar"><div class="bar-fill" id="ovBar"></div></div>
+    </div>
+    <div id="ovDone" hidden>
+      <div class="check" aria-hidden="true">✓</div>
+      <h2>완료되었습니다</h2>
+      <p id="ovDoneMsg" class="ov-msg"></p>
+      <div id="ovDownloads" class="downloads"></div>
+      <button type="button" class="btn btn-ghost" id="ovClose">닫기</button>
+    </div>
+    <div id="ovError" hidden>
+      <div class="cross" aria-hidden="true">!</div>
+      <h2>처리하지 못했습니다</h2>
+      <p id="ovErrMsg" class="ov-msg ov-err"></p>
+      <button type="button" class="btn btn-ghost" id="ovErrClose">닫기</button>
+    </div>
+  </div>
+</div>
+
+<footer class="site-footer">
+  <p>한모아 · 무료 · 오픈소스 · 파일은 브라우저를 떠나지 않습니다</p>
+</footer>
+
+<script src="vendor/pdf-lib.min.js"></script>
+<script src="vendor/pdf.min.js"></script>
+<script src="vendor/jszip.min.js"></script>
+<script src="vendor/tesseract.min.js"></script>
+<script src="js/brand.js?v=17"></script>
+<script src="js/core.js?v=17"></script>
+<script src="js/backend.js?v=17"></script>
+<script src="js/ui.js?v=17"></script>
+<script src="js/pages.js?v=17"></script>
+<script src="js/ocr.js?v=17"></script>
+<script src="js/editor.js?v=17"></script>
+<script src="js/scan.js?v=17"></script>
+<script src="js/tools.js?v=17"></script>
+<script src="js/app.js?v=17"></script>
+</body>
+</html>

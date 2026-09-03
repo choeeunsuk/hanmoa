@@ -1,0 +1,18 @@
+# 한모아 로컬 엔진에 필요한 패키지
+# start.bat 이 처음 실행할 때 자동으로 설치합니다.
+
+fastapi>=0.110
+uvicorn>=0.27
+python-multipart>=0.0.9
+
+# PDF 다루기
+pypdf>=4.0
+pymupdf>=1.24          # AGPL-3.0 — 표 인식, 쪽 렌더링, 복구
+pdf2docx>=0.5.8        # GPL-3.0  — PDF -> Word
+
+# Office 파일 만들기
+openpyxl>=3.1
+python-pptx>=0.6.23
+
+# 한글·오피스 COM 자동화 (Windows 전용)
+pywin32>=306 ; sys_platform == "win32"

@@ -1,0 +1,18 @@
+# 의존성 — npm install 로 받는다
+node_modules/
+
+# 파이썬
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# 로컬 엔진이 만드는 임시 작업 폴더
+hanmoa_*/
+
+# 편집기·운영체제
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log

@@ -1,0 +1,22 @@
+# 기본: 텍스트는 저장소에 LF 로 보관한다.
+* text=auto eol=lf
+
+# 배치 파일은 반드시 CRLF 여야 한다.
+# LF 로 내려받으면 cmd 가 줄을 끊지 못해 실행 자체가 실패한다.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# 아래는 손대지 말 것 (바이너리)
+*.gz          binary
+*.traineddata binary
+*.wasm        binary
+*.png         binary
+*.jpg         binary
+*.pdf         binary
+*.hwp         binary
+*.hwpx        binary
+
+# 동봉 라이브러리는 우리가 쓴 코드가 아니다.
+# 언어 통계와 diff 에서 빼 저장소를 실제 코드로 보이게 한다.
+web/vendor/** linguist-vendored
+web/vendor/** -diff

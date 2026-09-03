@@ -1,0 +1,15 @@
+{
+  "name": "hanmoa",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Browser-based PDF toolkit with Korean HWP merge support",
+  "scripts": {
+    "vendor": "node tools/vendor.js"
+  },
+  "dependencies": {
+    "@cantoo/pdf-lib": "2.9.1",
+    "jszip": "3.10.1",
+    "pdfjs-dist": "3.11.174",
+    "tesseract.js": "^5.1.1"
+  }
+}

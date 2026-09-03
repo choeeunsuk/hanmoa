@@ -1,0 +1,39 @@
+# web 폴더를 GitHub Pages 로 올린다.
+#
+# 저장소 Settings > Pages > Source 를 "GitHub Actions" 로 한 번만 바꿔 두면,
+# 이후 main 에 밀어 넣을 때마다 알아서 갱신된다.
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:      # 저장소 Actions 탭에서 손으로도 돌릴 수 있게
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 배포가 겹치지 않게 한 번에 하나만 돈다.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/configure-pages@v5
+
+      # 서버가 필요 없는 정적 파일만 올린다. server 폴더는 올라가지 않는다.
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
