@@ -6,6 +6,10 @@
 *.bat text eol=crlf
 *.cmd text eol=crlf
 
+# PowerShell 스크립트도 CRLF 로 둔다. 윈도우 편집기에서 열 때 자연스럽다.
+# BOM 은 파일 내용이라 줄바꿈 설정과 무관하게 그대로 보존된다.
+*.ps1 text eol=crlf
+
 # 메모장으로 여는 안내문. LF 로 내려가면 구형 메모장에서 한 줄로 뭉친다.
 *.txt text eol=crlf
 
@@ -14,6 +18,7 @@
 *.traineddata binary
 *.wasm        binary
 *.png         binary
+*.ico         binary
 *.jpg         binary
 *.pdf         binary
 *.hwp         binary
