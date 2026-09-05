@@ -34,11 +34,19 @@ netstat -ano | findstr ":%PORT%" | findstr "LISTENING" >nul 2>&1
 if not errorlevel 1 goto ALREADY_RUNNING
 
 :CHECK_PYTHON
-REM Windows 에는 진짜 Python 이 없어도 python.exe 라는 껍데기가 있다.
-REM AppData\Local\Microsoft\WindowsApps 에 있으며, 실행하면
-REM Microsoft Store 만 열고 "Python" 한 단어만 뱉는다.
-REM where 로는 진짜와 구분되지 않으므로, 후보를 실제로 실행해 보고
-REM 대답하는 것만 채택한다. python 이 껍데기여도 py 는 진짜일 수 있어 둘 다 본다.
+REM 쓸 수 있는 파이썬을 찾는다. 세 단계로 내려간다.
+REM
+REM   1) PATH 의 python / py. 멀쩡한 PC 는 여기서 끝나고 가장 빠르다.
+REM   2) 지난번에 찾아 둔 경로. 3단계를 매번 치르지 않으려고 적어 둔다.
+REM   3) 샅샅이 찾기. 레지스트리와 흔한 설치 폴더를 뒤진다.
+REM
+REM 3단계가 왜 필요한가. PATH 는 생각보다 자주 망가진다. 한글 사용자명이
+REM 들어간 PATH 항목들이 인코딩이 깨져 통째로 못 쓰게 된 PC 가 있었다.
+REM 명령 프롬프트에서는 되는데 바탕화면 바로가기로는 안 되는, 사용자로서는
+REM 영문을 알 수 없는 증상이 그렇게 생긴다.
+REM
+REM Windows 에는 진짜 파이썬이 없어도 python.exe 라는 껍데기가 있어서,
+REM 이름을 찾았다고 끝이 아니다. 실제로 실행해 보고 대답하는 것만 쓴다.
 REM
 REM 중첩 if 블록은 cmd 에서 잘 깨져서 goto 로만 흐름을 짠다.
 set PYEXE=
@@ -54,22 +62,41 @@ goto PYTHON_READY
 
 :TRY_PY
 where py >nul 2>&1
-if errorlevel 1 goto NO_WORKING_PYTHON
+if errorlevel 1 goto TRY_CACHED
 set FOUNDANY=1
 py -c "import sys" >nul 2>&1
-if errorlevel 1 goto NO_WORKING_PYTHON
+if errorlevel 1 goto TRY_CACHED
 set PYEXE=py
+goto PYTHON_READY
+
+:TRY_CACHED
+REM 지난번에 찾아 둔 경로가 아직 쓸 만하면 그대로 쓴다.
+if not exist "%~dp0.python_path" goto DEEP_SEARCH
+set /p PYEXE=<"%~dp0.python_path"
+if not defined PYEXE goto DEEP_SEARCH
+"%PYEXE%" -c "import sys" >nul 2>&1
+if errorlevel 1 goto DEEP_SEARCH
+set FOUNDANY=1
+goto PYTHON_READY
+
+:DEEP_SEARCH
+set PYEXE=
+echo   파이썬을 찾는 중입니다. 잠시만 기다려 주세요...
+for /f "usebackq delims=" %%p in (`powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0assets\find_python.ps1"`) do set "PYEXE=%%p"
+if not defined PYEXE goto NO_WORKING_PYTHON
+set FOUNDANY=1
+REM 다음 실행에서 다시 뒤지지 않도록 적어 둔다.
+>"%~dp0.python_path" echo %PYEXE%
 goto PYTHON_READY
 
 :NO_WORKING_PYTHON
 REM 이름조차 없으면 미설치, 이름은 있는데 대답을 못 하면 껍데기다.
 if defined FOUNDANY goto FAKE_PYTHON
 goto NEED_PYTHON
-
 :PYTHON_READY
 
 REM 필요한 구성요소가 없을 때만 설치한다.
-%PYEXE% -c "import fastapi, uvicorn, pypdf, pymupdf, pdf2docx, openpyxl, pptx, multipart" >nul 2>&1
+"%PYEXE%" -c "import fastapi, uvicorn, pypdf, pymupdf, pdf2docx, openpyxl, pptx, multipart" >nul 2>&1
 if errorlevel 1 goto INSTALL_DEPS
 
 :RUN
@@ -82,7 +109,7 @@ echo   ------------------------------------------
 echo.
 
 set HANMOA_PORT=%PORT%
-%PYEXE% server/main.py
+"%PYEXE%" server/main.py
 
 echo.
 echo   엔진이 종료되었습니다.
@@ -129,7 +156,7 @@ goto CHECK_PYTHON
 echo   처음 실행이라 필요한 구성요소를 설치합니다. 2~3분 걸립니다...
 echo   이때만 인터넷이 필요합니다.
 echo.
-%PYEXE% -m pip install --disable-pip-version-check -q -r server/requirements.txt
+"%PYEXE%" -m pip install --disable-pip-version-check -q -r server/requirements.txt
 if errorlevel 1 goto SHOW_REAL_ERROR
 echo   설치가 끝났습니다.
 echo.
@@ -143,7 +170,7 @@ echo   ------------------------------------------
 echo   설치가 실패했습니다. 원인을 확인합니다...
 echo   ------------------------------------------
 echo.
-%PYEXE% -m pip install --disable-pip-version-check -r server/requirements.txt
+"%PYEXE%" -m pip install --disable-pip-version-check -r server/requirements.txt
 echo.
 goto INSTALL_FAILED
 
