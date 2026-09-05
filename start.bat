@@ -14,6 +14,21 @@ echo   이 창은 켜 두세요. 창을 닫으면 엔진이 꺼집니다.
 echo   인터넷 연결은 필요하지 않습니다. 내 컴퓨터 안에서만 돕니다.
 echo.
 
+REM 바탕화면 바로가기를 처음 한 번만 만든다.
+REM
+REM 마커가 있으면 PowerShell 을 아예 부르지 않는다. 스크립트가 알아서 빠져
+REM 나오기는 하지만, PowerShell 을 띄우는 데만 1초 넘게 걸리는 PC 도 있어
+REM 매번 부르면 시작이 그만큼 늦어진다.
+REM
+REM %~dp0 는 끝에 역슬래시가 붙는다. 그대로 넘기면 마지막 역슬래시가
+REM 닫는 따옴표를 잡아먹어 인자가 깨진다. 미리 떼어 낸다.
+set "HANMOA_DIR=%~dp0"
+if "%HANMOA_DIR:~-1%"=="\" set "HANMOA_DIR=%HANMOA_DIR:~0,-1%"
+
+if exist "%~dp0.shortcut_made" goto SHORTCUT_DONE
+powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "%~dp0assets\make_shortcut.ps1" "%HANMOA_DIR%" >nul 2>&1
+:SHORTCUT_DONE
+
 REM 이미 켜져 있으면 Python 여부와 상관없이 브라우저만 연다.
 netstat -ano | findstr ":%PORT%" | findstr "LISTENING" >nul 2>&1
 if not errorlevel 1 goto ALREADY_RUNNING

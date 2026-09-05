@@ -16,3 +16,6 @@ hanmoa_*/
 .DS_Store
 Thumbs.db
 *.log
+
+# 바탕화면 바로가기를 이미 만들었다는 표시. 사용자 PC 마다 다르므로 저장소에 넣지 않는다.
+.shortcut_made
